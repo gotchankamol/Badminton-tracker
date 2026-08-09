@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Player {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  isToday   Boolean   @default(false)
+  hasLeft   Boolean   @default(false)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  payments  Payment[]
+}
+
+model Payment {
+  id           Int       @id @default(autoincrement())
+  playerId     Int
+  player       Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  amount       Int
+  shuttleCount Int?
+  at           DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+}
+
+model Shuttle {
+  id        Int      @id @default(autoincrement())
+  numbers   String[]
+  playerIds Int[]
+  date      String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model Settings {
+  id               Int       @id @default(1)
+  price            Int       @default(22)
+  maxShuttleNumber Int       @default(12)
+  lastActiveDate   String?
+  dayResetHour     Int       @default(5)
+  dayResetEnabled  Boolean   @default(true)
+  roundStartAt     DateTime? @db.Timestamptz(3)
+}
