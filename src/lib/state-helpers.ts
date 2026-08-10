@@ -91,6 +91,19 @@ export function playerUsage(state: AppState, id: number): number {
   return total;
 }
 
+// Same as playerUsage but scoped to shuttles logged since the current round started —
+// used for the headline numbers in the summary tab so they read as "this round," not a
+// lifetime total that only ever grows.
+export function playerRoundUsage(state: AppState, id: number): number {
+  let total = 0;
+  state.shuttles.forEach((s) => {
+    if (!isInCurrentRound(state, s)) return;
+    const occurrences = s.playerIds.filter((pid) => pid === id).length;
+    total += occurrences * shuttleUnitCount(s);
+  });
+  return total;
+}
+
 export function paidTotal(p: Player): number {
   return (p.payments || []).reduce((sum, pay) => sum + pay.amount, 0);
 }

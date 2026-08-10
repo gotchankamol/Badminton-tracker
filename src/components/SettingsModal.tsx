@@ -19,6 +19,7 @@ export default function SettingsModal({
   onUpdateSettings,
   onEndRound,
   onOpenHistory,
+  onOpenPlayerHistory,
   onExportText,
   onExportImage,
   onExportCsv,
@@ -34,6 +35,7 @@ export default function SettingsModal({
   onUpdateSettings: (price: number, maxShuttleNumber: number, dayResetHour: number, dayResetEnabled: boolean) => void;
   onEndRound: () => void;
   onOpenHistory: () => void;
+  onOpenPlayerHistory: () => void;
   onExportText: () => void;
   onExportImage: () => void;
   onExportCsv: () => void;
@@ -75,7 +77,11 @@ export default function SettingsModal({
         </div>
 
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
-          <button className="save" style={{ background: "var(--purple)", fontSize: 13.5 }} onClick={onOpenHistory}>📅 ดูประวัติย้อนหลัง</button>
+          <div className="hint" style={{ marginTop: 0 }}>📅 ดูประวัติย้อนหลัง</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="save" style={{ flex: 1, background: "var(--purple)", fontSize: 13 }} onClick={onOpenHistory}>📅 ตามวันที่</button>
+            <button className="save" style={{ flex: 1, background: "var(--purple)", fontSize: 13 }} onClick={onOpenPlayerHistory}>🧾 ตามรายคน</button>
+          </div>
         </div>
 
         <div className="price-row" style={{ marginTop: 16, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>

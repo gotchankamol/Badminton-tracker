@@ -11,6 +11,7 @@ import ShuttlesTab from "./ShuttlesTab";
 import SummaryTab from "./SummaryTab";
 import SettingsModal from "./SettingsModal";
 import HistoryModal from "./HistoryModal";
+import PlayerHistoryModal from "./PlayerHistoryModal";
 import ExportModal, { type ExportMode } from "./ExportModal";
 import BackupModal, { type BackupMode } from "./BackupModal";
 import RosterListModal, { type RosterListMode } from "./RosterListModal";
@@ -37,6 +38,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
   const [tab, setTab] = useState<"shuttles" | "summary">("shuttles");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [playerHistoryOpen, setPlayerHistoryOpen] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>(null);
   const [backupMode, setBackupMode] = useState<BackupMode>(null);
   const [rosterListMode, setRosterListMode] = useState<RosterListMode>(null);
@@ -200,6 +202,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
         onUpdateSettings={handleUpdateSettings}
         onEndRound={handleEndRound}
         onOpenHistory={() => { setSettingsOpen(false); setHistoryOpen(true); }}
+        onOpenPlayerHistory={() => { setSettingsOpen(false); setPlayerHistoryOpen(true); }}
         onExportText={() => setExportMode("text")}
         onExportImage={() => setExportMode("image")}
         onExportCsv={() => setExportMode("csv")}
@@ -210,6 +213,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
         sound={sound}
       />
       <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} state={state} showToast={showToast} />
+      <PlayerHistoryModal open={playerHistoryOpen} onClose={() => setPlayerHistoryOpen(false)} state={state} />
       <ExportModal mode={exportMode} onClose={() => setExportMode(null)} state={state} showToast={showToast} />
       <BackupModal
         mode={backupMode}

@@ -9,28 +9,46 @@ import {
   playerOwed,
   playerOwedSplit,
   playerPaymentBreakdown,
+  playerRoundUsage,
   playerUsage,
 } from "@/lib/state-helpers";
-
-function shortThaiDateTime(createdAt: string, fallbackDate: string): string {
-  const dt = createdAt ? new Date(createdAt) : null;
-  if (dt) {
-    return dt.toLocaleDateString("th-TH", { day: "numeric", month: "short" }) + " " + dt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.";
-  }
-  const [y, m, d] = fallbackDate.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
-}
+import { PaymentGroupRow, UnpaidGamesList } from "./PaymentHistoryList";
 
 function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Player; onPay: (id: number) => void; clearedOldDebt?: boolean }) {
   const [showDetails, setShowDetails] = useState(false);
 
-  const count = playerUsage(state, p.id);
+  const activeThisRound = playerActiveInCurrentRound(state, p.id);
+  const lifetimeCount = playerUsage(state, p.id);
+  const roundCount = playerRoundUsage(state, p.id);
+  // Carried-over/cleared-old-debt rows never played this round, so their headline is
+  // their (old) lifetime total; rows active this round show only this round's count —
+  // otherwise the number would keep growing forever across every round ever played.
+  const count = activeThisRound ? roundCount : lifetimeCount;
   const total = count * state.settings.price;
   const owed = playerOwed(state, p);
   const settled = isSettled(state, p);
   const { groups, unpaid } = playerPaymentBreakdown(state, p);
   const { oldOwed, roundOwed } = playerOwedSplit(state, p);
   const hasDetails = groups.length > 0 || unpaid.length > 0;
+  const pamt = settled ? total : (activeThisRound ? roundOwed : owed);
+
+  // If a payment made during this round covered more shuttles than this round actually
+  // has, the extra must have been old (pre-round) debt getting swept up in the same
+  // payment — pay() always settles everything owed at once. Flag it so that debt
+  // doesn't just quietly vanish from view once the row shows round-only numbers.
+  const roundStart = new Date(state.currentRoundStart);
+  const paidThisRoundUnits = (p.payments || [])
+    .filter((pay) => pay.at && new Date(pay.at) >= roundStart)
+    .reduce((s, pay) => s + (pay.shuttleCount || 0), 0);
+  const oldDebtClearedAmount = activeThisRound && settled && paidThisRoundUnits > roundCount
+    ? (paidThisRoundUnits - roundCount) * state.settings.price
+    : 0;
+
+  // Only this round's payments show here — the full lifetime ledger lives in
+  // Settings → ประวัติการจ่ายเงินรายคน instead, so this stays focused on "right now."
+  const recentGroups = groups
+    .filter((grp) => grp.payment.at && new Date(grp.payment.at) >= roundStart)
+    .map((grp, i) => ({ grp, num: i + 1 }));
 
   return (
     <div className="player-block">
@@ -38,9 +56,10 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
         <div className="pname" onClick={() => hasDetails && setShowDetails((v) => !v)}>
           {p.name}
           {clearedOldDebt && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" }}> (จ่ายยอดค้างวันก่อน)</span>}
+          {oldDebtClearedAmount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" }}> (+ เคลียร์ค้างเก่า {oldDebtClearedAmount}บ.)</span>}
         </div>
         <div className="pcount">{count} ลูก</div>
-        <div className="pamt">{settled ? total : owed}</div>
+        <div className="pamt">{pamt}</div>
         <button className="pay-btn" onClick={() => onPay(p.id)}>{settled ? "✓" : ""}</button>
       </div>
       {!settled && oldOwed > 0 && roundOwed > 0 && (
@@ -50,46 +69,8 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
       )}
       {showDetails && (
         <div className="pay-history">
-          {groups.map((grp, gi) => {
-            const dt = grp.payment.at ? new Date(grp.payment.at) : null;
-            const dateTimeStr = dt
-              ? dt.toLocaleDateString("th-TH", { day: "numeric", month: "short" }) + " " + dt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น."
-              : "";
-            return (
-              <div key={grp.payment.id} style={{ marginBottom: 8 }}>
-                <div className="pay-history-row" style={{ fontWeight: 800, color: "var(--ink)" }}>
-                  <span>🧾 ครั้งที่ {gi + 1}{dateTimeStr ? " · " + dateTimeStr : ""}</span>
-                  <span>{grp.payment.amount} บาท</span>
-                </div>
-                {grp.games.length === 0 && (
-                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, padding: "2px 0 0 14px" }}>ไม่มีข้อมูลรายการละเอียดของยอดนี้</div>
-                )}
-                {grp.games.map((cg, ci) => (
-                  <div key={ci} style={{ padding: "3px 0 3px 14px", borderBottom: "1px dashed rgba(43,33,64,0.1)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                      <span>{cg.entry.numbers.map((n) => `#${n}`).join(" ") || "-"} <span style={{ opacity: 0.7, fontWeight: 600 }}>· {shortThaiDateTime(cg.entry.createdAt, cg.entry.date)}</span></span>
-                      <span>×{cg.unitsCovered}</span>
-                    </div>
-                    <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>{cg.entry.namesStr}</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-          {unpaid.length > 0 && (
-            <div>
-              <div className="pay-history-row" style={{ fontWeight: 800, color: "var(--pink)" }}>🔴 ยังไม่จ่าย</div>
-              {unpaid.map((cg, ci) => (
-                <div key={ci} style={{ padding: "3px 0 3px 14px", borderBottom: "1px dashed rgba(43,33,64,0.1)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                    <span>{cg.entry.numbers.map((n) => `#${n}`).join(" ") || "-"} <span style={{ opacity: 0.7, fontWeight: 600 }}>· {shortThaiDateTime(cg.entry.createdAt, cg.entry.date)}</span></span>
-                    <span>×{cg.unitsCovered}</span>
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>{cg.entry.namesStr}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {recentGroups.map(({ grp, num }) => <PaymentGroupRow key={grp.payment.id} grp={grp} num={num} />)}
+          <UnpaidGamesList unpaid={unpaid} />
         </div>
       )}
     </div>
@@ -98,6 +79,7 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
 
 export default function SummaryTab({ state, onPay }: { state: AppState; onPay: (id: number) => void }) {
   const sortByUsage = (a: Player, b: Player) => playerUsage(state, b.id) - playerUsage(state, a.id);
+  const sortByRoundUsage = (a: Player, b: Player) => playerRoundUsage(state, b.id) - playerRoundUsage(state, a.id);
 
   // Debt that's still unpaid from before this round (they haven't played this round at
   // all, but still owe money) gets its own card, separate from this round's activity —
@@ -107,7 +89,7 @@ export default function SummaryTab({ state, onPay }: { state: AppState; onPay: (
     .filter((p) => playerOwed(state, p) > 0 && !playerActiveInCurrentRound(state, p.id))
     .sort(sortByUsage);
 
-  const roundPlayers = state.roster.filter((p) => playerActiveInCurrentRound(state, p.id)).sort(sortByUsage);
+  const roundPlayers = state.roster.filter((p) => playerActiveInCurrentRound(state, p.id)).sort(sortByRoundUsage);
   const unpaid = roundPlayers.filter((p) => !isSettled(state, p));
 
   // Old debtors who paid off during this round (see playerJustClearedOldDebt) join the
