@@ -107,6 +107,18 @@ export function playerActiveInCurrentRound(state: AppState, id: number): boolean
   return state.shuttles.some((s) => s.playerIds.includes(id) && isInCurrentRound(state, s));
 }
 
+// A player who owed money from before this round but didn't play today: once their
+// debt is fully paid off they'd otherwise vanish from the summary with no trace. If
+// the payment that cleared them landed during this round, keep them visible in the
+// "paid" list (caller adds a note) instead — this resets naturally once "จบรอบ" starts
+// a new round, so it never accumulates every old debtor forever.
+export function playerJustClearedOldDebt(state: AppState, p: Player): boolean {
+  if (playerActiveInCurrentRound(state, p.id)) return false;
+  if (playerUsage(state, p.id) === 0) return false;
+  if (!isSettled(state, p)) return false;
+  return (p.payments || []).some((pay) => pay.at && new Date(pay.at) >= new Date(state.currentRoundStart));
+}
+
 // Splits a player's outstanding balance into "from before this round" vs "from this
 // round". Payments aren't tied to specific shuttles, so — same FIFO convention as
 // payment.shuttleCount elsewhere — a payment always clears the oldest usage first,
@@ -134,6 +146,7 @@ export type GameEntry = {
   shuttleId: number;
   numbers: string[];
   date: string;
+  createdAt: string;
   namesStr: string;
   units: number;
 };
@@ -152,7 +165,7 @@ function playerGamesChronological(state: AppState, id: number): GameEntry[] {
           return g.count > 1 ? `${nm} ×${g.count}` : nm;
         })
         .join(", ");
-      return { shuttleId: s.id, numbers: s.numbers || [], date: s.date, namesStr, units: shares * shuttleUnitCount(s) };
+      return { shuttleId: s.id, numbers: s.numbers || [], date: s.date, createdAt: s.createdAt, namesStr, units: shares * shuttleUnitCount(s) };
     });
 }
 

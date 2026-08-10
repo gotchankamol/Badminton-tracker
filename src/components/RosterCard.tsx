@@ -98,34 +98,27 @@ export default function RosterCard({
         👥 รวม {totalCount} คน
       </div>
       <div className="hint">เลือกผู้เล่นที่มาวันนี้จากรายการด้านล่าง</div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <select
-          className="num-select"
-          style={{ flex: 1, marginBottom: 0 }}
-          value=""
-          onChange={(e) => {
-            const id = parseInt(e.target.value, 10);
-            if (id) onSetPresent(id);
-          }}
-        >
-          <option value="">+ เลือกผู้เล่นวันนี้</option>
-          {notPresentPlayers.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+      <select
+        className="num-select"
+        value=""
+        onChange={(e) => {
+          const val = e.target.value;
+          if (!val) return;
+          if (val === "__all__") { onAddAllPresent(); return; }
+          const id = parseInt(val, 10);
+          if (id) onSetPresent(id);
+        }}
+      >
+        <option value="">+ เลือกผู้เล่นวันนี้</option>
         {notPresentPlayers.length > 0 && (
-          <button
-            onClick={onAddAllPresent}
-            style={{
-              background: "var(--green)", color: "#fff", border: "2px solid var(--ink)", borderRadius: 9,
-              padding: "0 12px", fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 12, cursor: "pointer",
-              boxShadow: "2px 2px 0 rgba(43,33,64,0.2)", whiteSpace: "nowrap",
-            }}
-          >
-            + เพิ่มทุกคน
-          </button>
+          <option value="__all__" style={{ fontWeight: 800, color: "#0BAE84" }}>
+            ⚡ เพิ่มทุกคน ({notPresentPlayers.length})
+          </option>
         )}
-      </div>
+        {notPresentPlayers.map((p) => (
+          <option key={p.id} value={p.id}>{p.name}</option>
+        ))}
+      </select>
       <div className="pick-grid">
         {presentPlayers.map((p) => {
           const col = chipColor(p.name);

@@ -5,18 +5,23 @@ import type { AppState, Player } from "@/lib/types";
 import {
   isSettled,
   playerActiveInCurrentRound,
+  playerJustClearedOldDebt,
   playerOwed,
   playerOwedSplit,
   playerPaymentBreakdown,
   playerUsage,
 } from "@/lib/state-helpers";
 
-function shortThaiDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
+function shortThaiDateTime(createdAt: string, fallbackDate: string): string {
+  const dt = createdAt ? new Date(createdAt) : null;
+  if (dt) {
+    return dt.toLocaleDateString("th-TH", { day: "numeric", month: "short" }) + " " + dt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.";
+  }
+  const [y, m, d] = fallbackDate.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
 }
 
-function PlayerRow({ state, p, onPay }: { state: AppState; p: Player; onPay: (id: number) => void }) {
+function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Player; onPay: (id: number) => void; clearedOldDebt?: boolean }) {
   const [showDetails, setShowDetails] = useState(false);
 
   const count = playerUsage(state, p.id);
@@ -30,7 +35,10 @@ function PlayerRow({ state, p, onPay }: { state: AppState; p: Player; onPay: (id
   return (
     <div className="player-block">
       <div className={`player-row${settled ? " is-paid" : ""}`}>
-        <div className="pname" onClick={() => hasDetails && setShowDetails((v) => !v)}>{p.name}</div>
+        <div className="pname" onClick={() => hasDetails && setShowDetails((v) => !v)}>
+          {p.name}
+          {clearedOldDebt && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" }}> (จ่ายยอดค้างวันก่อน)</span>}
+        </div>
         <div className="pcount">{count} ลูก</div>
         <div className="pamt">{settled ? total : owed}</div>
         <button className="pay-btn" onClick={() => onPay(p.id)}>{settled ? "✓" : ""}</button>
@@ -59,7 +67,7 @@ function PlayerRow({ state, p, onPay }: { state: AppState; p: Player; onPay: (id
                 {grp.games.map((cg, ci) => (
                   <div key={ci} style={{ padding: "3px 0 3px 14px", borderBottom: "1px dashed rgba(43,33,64,0.1)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                      <span>{cg.entry.numbers.map((n) => `#${n}`).join(" ") || "-"} <span style={{ opacity: 0.7, fontWeight: 600 }}>· {shortThaiDate(cg.entry.date)}</span></span>
+                      <span>{cg.entry.numbers.map((n) => `#${n}`).join(" ") || "-"} <span style={{ opacity: 0.7, fontWeight: 600 }}>· {shortThaiDateTime(cg.entry.createdAt, cg.entry.date)}</span></span>
                       <span>×{cg.unitsCovered}</span>
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>{cg.entry.namesStr}</div>
@@ -74,7 +82,7 @@ function PlayerRow({ state, p, onPay }: { state: AppState; p: Player; onPay: (id
               {unpaid.map((cg, ci) => (
                 <div key={ci} style={{ padding: "3px 0 3px 14px", borderBottom: "1px dashed rgba(43,33,64,0.1)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                    <span>{cg.entry.numbers.map((n) => `#${n}`).join(" ") || "-"} <span style={{ opacity: 0.7, fontWeight: 600 }}>· {shortThaiDate(cg.entry.date)}</span></span>
+                    <span>{cg.entry.numbers.map((n) => `#${n}`).join(" ") || "-"} <span style={{ opacity: 0.7, fontWeight: 600 }}>· {shortThaiDateTime(cg.entry.createdAt, cg.entry.date)}</span></span>
                     <span>×{cg.unitsCovered}</span>
                   </div>
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>{cg.entry.namesStr}</div>
@@ -101,9 +109,13 @@ export default function SummaryTab({ state, onPay }: { state: AppState; onPay: (
 
   const roundPlayers = state.roster.filter((p) => playerActiveInCurrentRound(state, p.id)).sort(sortByUsage);
   const unpaid = roundPlayers.filter((p) => !isSettled(state, p));
+
+  // Old debtors who paid off during this round (see playerJustClearedOldDebt) join the
+  // "paid" list instead of vanishing once their carried-over balance hits zero.
+  const clearedOldDebt = state.roster.filter((p) => playerJustClearedOldDebt(state, p)).sort(sortByUsage);
   const paid = roundPlayers.filter((p) => isSettled(state, p));
 
-  if (carriedOver.length === 0 && roundPlayers.length === 0) {
+  if (carriedOver.length === 0 && roundPlayers.length === 0 && clearedOldDebt.length === 0) {
     return <div className="empty-msg">ยังไม่มีใครใช้ลูกแบดหรือมีประวัติจ่ายเงินเลย</div>;
   }
 
@@ -119,10 +131,11 @@ export default function SummaryTab({ state, onPay }: { state: AppState; onPay: (
         <div className="un-label" style={{ justifyContent: "flex-start" }}>🏸 รอบนี้</div>
       )}
       {unpaid.map((p) => <PlayerRow key={p.id} state={state} p={p} onPay={onPay} />)}
-      {paid.length > 0 && (
+      {(paid.length > 0 || clearedOldDebt.length > 0) && (
         <>
           <div className="un-label" style={{ marginTop: unpaid.length > 0 ? 18 : 0, justifyContent: "flex-start" }}>✅ คนที่จ่ายเงินแล้ว</div>
           {paid.map((p) => <PlayerRow key={p.id} state={state} p={p} onPay={onPay} />)}
+          {clearedOldDebt.map((p) => <PlayerRow key={p.id} state={state} p={p} onPay={onPay} clearedOldDebt />)}
         </>
       )}
     </div>

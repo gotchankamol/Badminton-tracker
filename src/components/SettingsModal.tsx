@@ -55,7 +55,30 @@ export default function SettingsModal({
       <div className="modal-card">
         <div className="card-title">⚙️ ตั้งค่า <span className="link" onClick={onClose}>ปิด ✕</span></div>
 
-        <div className="price-row">
+        <div style={{ marginTop: 4 }}>
+          <div className="hint" style={{ marginTop: 0 }}>🔁 จบรอบวันนี้</div>
+          <button className="save" style={{ background: "var(--pink)", fontSize: 13.5 }} onClick={onEndRound}>
+            🔁 จบรอบนี้ เริ่มรอบใหม่
+          </button>
+          <div className="hint" style={{ marginBottom: 0 }}>
+            ใช้ตอนทุกคนจ่ายครบแล้วอยากเริ่มรอบใหม่ในวันเดียวกัน — ล้างแค่รายชื่อ &quot;อยู่ในสนาม/กลับแล้ว&quot; และทำให้แท็บลูกแบด/สรุปเงินเริ่มนับใหม่ ไม่ลบข้อมูลลูกแบดหรือยอดจ่ายเดิม (ดูย้อนหลังได้เสมอ) กดได้หลายครั้งต่อวันถ้าเล่นหลายรอบ
+          </div>
+        </div>
+
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
+          <div className="hint" style={{ marginTop: 0 }}>📄 สรุปรายงานวันนี้</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="save" style={{ flex: 1, background: "var(--blue)", fontSize: 12.5, padding: "9px 4px" }} onClick={onExportText}>💬 ข้อความ</button>
+            <button className="save" style={{ flex: 1, background: "var(--purple)", fontSize: 12.5, padding: "9px 4px" }} onClick={onExportImage}>🖼️ รูปภาพ</button>
+            <button className="save" style={{ flex: 1, background: "var(--green)", fontSize: 12.5, padding: "9px 4px" }} onClick={onExportCsv}>📊 CSV</button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
+          <button className="save" style={{ background: "var(--purple)", fontSize: 13.5 }} onClick={onOpenHistory}>📅 ดูประวัติย้อนหลัง</button>
+        </div>
+
+        <div className="price-row" style={{ marginTop: 16, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
           <label>ราคาต่อลูก</label>
           <div className="price-input-group">
             <input
@@ -74,10 +97,10 @@ export default function SettingsModal({
             <input
               type="number"
               min={1}
-              max={99}
+              max={120}
               value={maxNum}
               onChange={(e) => setMaxNum(parseInt(e.target.value, 10))}
-              onBlur={() => onUpdateSettings(price, isNaN(maxNum) || maxNum < 1 ? 12 : maxNum, resetHour, resetEnabled)}
+              onBlur={() => onUpdateSettings(price, isNaN(maxNum) || maxNum < 1 ? 12 : Math.min(maxNum, 120), resetHour, resetEnabled)}
             />
             <span>เลข</span>
           </div>
@@ -97,16 +120,21 @@ export default function SettingsModal({
             เวลาตัดรอบขึ้นวันใหม่อัตโนมัติ
           </label>
           <div className="price-input-group" style={{ opacity: resetEnabled ? 1 : 0.4 }}>
-            <input
-              type="number"
-              min={0}
-              max={23}
+            <select
+              className="num-select"
+              style={{ width: "auto", minWidth: 110, marginBottom: 0, padding: "8px 30px 8px 12px", fontSize: 13 }}
               value={resetHour}
               disabled={!resetEnabled}
-              onChange={(e) => setResetHour(parseInt(e.target.value, 10))}
-              onBlur={() => onUpdateSettings(price, maxNum, isNaN(resetHour) ? 5 : resetHour, resetEnabled)}
-            />
-            <span>น.</span>
+              onChange={(e) => {
+                const hour = parseInt(e.target.value, 10);
+                setResetHour(hour);
+                onUpdateSettings(price, maxNum, hour, resetEnabled);
+              }}
+            >
+              {Array.from({ length: 24 }, (_, i) => i).map((h) => (
+                <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="hint" style={{ marginBottom: 0 }}>
@@ -159,29 +187,6 @@ export default function SettingsModal({
           <div className="hint" style={{ marginBottom: 0 }}>
             ตั้งค่าเสียงนี้เฉพาะเครื่องนี้เท่านั้น ไม่กระทบคนอื่นที่เปิดลิงก์เดียวกัน
           </div>
-        </div>
-
-        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
-          <div className="hint" style={{ marginTop: 0 }}>🔁 จบรอบวันนี้</div>
-          <button className="save" style={{ background: "var(--pink)", fontSize: 13.5 }} onClick={onEndRound}>
-            🔁 จบรอบนี้ เริ่มรอบใหม่
-          </button>
-          <div className="hint" style={{ marginBottom: 0 }}>
-            ใช้ตอนทุกคนจ่ายครบแล้วอยากเริ่มรอบใหม่ในวันเดียวกัน — ล้างแค่รายชื่อ &quot;อยู่ในสนาม/กลับแล้ว&quot; และทำให้แท็บลูกแบด/สรุปเงินเริ่มนับใหม่ ไม่ลบข้อมูลลูกแบดหรือยอดจ่ายเดิม (ดูย้อนหลังได้เสมอ) กดได้หลายครั้งต่อวันถ้าเล่นหลายรอบ
-          </div>
-        </div>
-
-        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
-          <div className="hint" style={{ marginTop: 0 }}>📄 สรุปรายงานวันนี้</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="save" style={{ flex: 1, background: "var(--blue)", fontSize: 12.5, padding: "9px 4px" }} onClick={onExportText}>💬 ข้อความ</button>
-            <button className="save" style={{ flex: 1, background: "var(--purple)", fontSize: 12.5, padding: "9px 4px" }} onClick={onExportImage}>🖼️ รูปภาพ</button>
-            <button className="save" style={{ flex: 1, background: "var(--green)", fontSize: 12.5, padding: "9px 4px" }} onClick={onExportCsv}>📊 CSV</button>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
-          <button className="save" style={{ background: "var(--purple)", fontSize: 13.5 }} onClick={onOpenHistory}>📅 ดูประวัติย้อนหลัง</button>
         </div>
 
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
