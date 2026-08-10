@@ -28,13 +28,27 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
   const hasDetails = groups.length > 0 || unpaid.length > 0;
   const lastPayment = p.payments && p.payments.length > 0 ? p.payments[p.payments.length - 1] : null;
 
+  // If a payment made during this round covered more shuttles than this round actually
+  // has, the extra must have been old (pre-round) debt getting swept up in the same
+  // payment — pay() always settles everything owed at once. Flag it so that debt
+  // doesn't just quietly vanish from view once the row shows round-only numbers.
+  const roundStart = new Date(state.currentRoundStart);
+  const paidThisRoundUnits = (p.payments || [])
+    .filter((pay) => pay.at && new Date(pay.at) >= roundStart)
+    .reduce((s, pay) => s + (pay.shuttleCount || 0), 0);
+  const oldDebtClearedAmount = activeThisRound && settled && paidThisRoundUnits > roundCount
+    ? (paidThisRoundUnits - roundCount) * state.settings.price
+    : 0;
+
   let count: number;
   let pamt: number;
   if (activeThisRound) {
     // Active this round: headline is this round's count/amount only — otherwise the
-    // number would keep growing forever across every round ever played.
+    // number would keep growing forever across every round ever played. But once
+    // settled, fold in any old debt that was cleared alongside this round's payment
+    // so the total shown actually matches what was collected (see oldDebtClearedAmount).
     count = roundCount;
-    pamt = settled ? roundCount * state.settings.price : roundOwed;
+    pamt = settled ? roundCount * state.settings.price + oldDebtClearedAmount : owed;
   } else if (settled) {
     // Not active this round but settled only happens via playerJustClearedOldDebt —
     // show what that specific payment actually cleared, not the lifetime total (which
@@ -49,18 +63,6 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
     pamt = owed;
   }
 
-  // If a payment made during this round covered more shuttles than this round actually
-  // has, the extra must have been old (pre-round) debt getting swept up in the same
-  // payment — pay() always settles everything owed at once. Flag it so that debt
-  // doesn't just quietly vanish from view once the row shows round-only numbers.
-  const roundStart = new Date(state.currentRoundStart);
-  const paidThisRoundUnits = (p.payments || [])
-    .filter((pay) => pay.at && new Date(pay.at) >= roundStart)
-    .reduce((s, pay) => s + (pay.shuttleCount || 0), 0);
-  const oldDebtClearedAmount = activeThisRound && settled && paidThisRoundUnits > roundCount
-    ? (paidThisRoundUnits - roundCount) * state.settings.price
-    : 0;
-
   // Only this round's payments show here — the full lifetime ledger lives in
   // Settings → ประวัติการจ่ายเงินรายคน instead, so this stays focused on "right now."
   const recentGroups = groups
@@ -71,17 +73,16 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
     <div className="player-block">
       <div className={`player-row${settled ? " is-paid" : ""}`}>
         <div className="pname" onClick={() => hasDetails && setShowDetails((v) => !v)}>
-          <span className={p.isGuest ? "guest-name" : undefined}>{p.isGuest && "🎫 "}{p.name}</span>
+          <span>{p.name}{p.isGuest && " 😎"}</span>
           {clearedOldDebt && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" }}> (จ่ายยอดค้างวันก่อน)</span>}
-          {oldDebtClearedAmount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" }}> (+ เคลียร์ค้างเก่า {oldDebtClearedAmount}บ.)</span>}
         </div>
         <div className="pcount">{count} ลูก</div>
         <div className="pamt">{pamt}</div>
         <button className="pay-btn" onClick={() => onPay(p.id)}>{settled ? "✓" : ""}</button>
       </div>
-      {!settled && oldOwed > 0 && roundOwed > 0 && (
-        <div style={{ fontSize: 11, color: "var(--pink)", fontWeight: 700, padding: "4px 14px 0" }}>
-          วันนี้ {roundOwed}บ. + ค้างเก่า {oldOwed}บ.
+      {((!settled && oldOwed > 0 && roundOwed > 0) || (settled && oldDebtClearedAmount > 0)) && (
+        <div style={{ fontSize: 11, color: settled ? "var(--ink-soft)" : "var(--pink)", fontWeight: 700, padding: "4px 14px 0" }}>
+          วันนี้ {settled ? roundCount * state.settings.price : roundOwed}บ. + ค้างเก่า {settled ? oldDebtClearedAmount : oldOwed}บ.
         </div>
       )}
       {showDetails && (

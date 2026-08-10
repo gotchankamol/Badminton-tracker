@@ -17,12 +17,14 @@ export default function ShuttlesTab({
   onDeleteShuttle,
   onAddNumberToShuttle,
   showToast,
+  onShuttleAdded,
 }: {
   state: AppState;
   onAddShuttle: (number: string, shares: Record<string, number>) => void;
   onDeleteShuttle: (id: number, orderIndex: number) => void;
   onAddNumberToShuttle: (shuttleId: number, number: string) => void;
   showToast: (msg: string) => void;
+  onShuttleAdded: () => void;
 }) {
   const [selectedNumber, setSelectedNumber] = useState<string>("");
   const [shares, setShares] = useState<Record<string, number>>({});
@@ -61,6 +63,7 @@ export default function ShuttlesTab({
     onAddShuttle(selectedNumber, validShares);
     setSelectedNumber("");
     setShares({});
+    onShuttleAdded();
   }
 
   const max = state.settings.maxShuttleNumber || 12;
@@ -136,15 +139,11 @@ export default function ShuttlesTab({
         <div className="pick-grid">
           {todayIds.map((id) => {
             const nm = rosterName(state, id);
-            const isGuest = state.roster.find((p) => p.id === id)?.isGuest;
             const col = chipColor(nm);
             const s = validShares[String(id)] || 0;
-            const style = {
-              ...(s > 0
-                ? { background: col.border, borderColor: col.border, color: "#fff" }
-                : { background: col.bg, borderColor: col.border, color: "var(--ink)" }),
-              fontStyle: isGuest ? "italic" as const : undefined,
-            };
+            const style = s > 0
+              ? { background: col.border, borderColor: col.border, color: "#fff" }
+              : { background: col.bg, borderColor: col.border, color: "var(--ink)" };
             return (
               <button type="button" key={id} className={`toggle-chip${s > 0 ? " selected" : ""}`} style={style} onClick={() => togglePick(id)}>
                 {s > 0 ? `${nm} ×${s}` : nm}
@@ -242,6 +241,7 @@ export default function ShuttlesTab({
                         if (!n) return;
                         onAddNumberToShuttle(s.id, n);
                         setAddNumOpenFor(null);
+                        onShuttleAdded();
                       }}
                     >
                       <option value="">— เลือกหมายเลข —</option>

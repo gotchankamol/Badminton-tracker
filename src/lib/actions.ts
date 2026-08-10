@@ -373,6 +373,19 @@ function normalizeBackup(parsed: BackupData): Omit<AppState, "currentRoundStart"
   return { roster, shuttles, settings: { price, maxShuttleNumber, dayResetHour, dayResetEnabled, roundStartAt } };
 }
 
+// Wipes every player, shuttle, and payment, and puts Settings back to the values in
+// prisma/schema.prisma's @default(...) — an escape hatch for starting completely over
+// (e.g. testing, or handing the tracker to a new group), distinct from "จบรอบ" which
+// only resets the current round and keeps all history.
+export async function resetApp() {
+  await replaceAllData({
+    roster: [],
+    shuttles: [],
+    settings: { price: 22, maxShuttleNumber: 12, dayResetHour: 5, dayResetEnabled: true, roundStartAt: null },
+  });
+  return currentState();
+}
+
 export async function importBackup(json: string) {
   let parsed: BackupData;
   try {

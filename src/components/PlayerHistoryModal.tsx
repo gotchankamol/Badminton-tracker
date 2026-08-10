@@ -24,7 +24,7 @@ export default function PlayerHistoryModal({ open, onClose, state }: { open: boo
         <div className="card-title">
           <span>
             {selected ? (
-              <>🧾 {selected.isGuest && "🎫 "}<span className={selected.isGuest ? "guest-name" : undefined}>{selected.name}</span></>
+              <>🧾 {selected.name}{selected.isGuest && " 😎"}</>
             ) : "🧾 ประวัติการจ่ายเงินรายคน"}
           </span>
           <span className="link" onClick={close}>ปิด ✕</span>
@@ -40,7 +40,7 @@ export default function PlayerHistoryModal({ open, onClose, state }: { open: boo
                 const owed = playerOwed(state, p);
                 return (
                   <div className="roster-row" key={p.id} style={{ cursor: "pointer" }} onClick={() => setSelectedId(p.id)}>
-                    <div className={`rname${p.isGuest ? " guest-name" : ""}`}>{p.isGuest && "🎫 "}{p.name}</div>
+                    <div className="rname">{p.name}{p.isGuest && " 😎"}</div>
                     <div style={{ fontSize: 11.5, color: owed > 0 ? "var(--pink)" : "var(--ink-soft)", fontWeight: 700, marginRight: 6 }}>
                       {count} ลูก{owed > 0 ? ` · ค้าง ${owed} บ.` : " · จ่ายครบแล้ว"}
                     </div>

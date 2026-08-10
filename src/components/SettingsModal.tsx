@@ -27,6 +27,7 @@ export default function SettingsModal({
   onOpenBackupImport,
   onOpenRosterExport,
   onOpenRosterImport,
+  onResetApp,
   sound,
 }: {
   open: boolean;
@@ -43,6 +44,7 @@ export default function SettingsModal({
   onOpenBackupImport: () => void;
   onOpenRosterExport: () => void;
   onOpenRosterImport: () => void;
+  onResetApp: () => void;
   sound: SoundControls;
 }) {
   const [price, setPrice] = useState(state.settings.price);
@@ -211,6 +213,16 @@ export default function SettingsModal({
             <button className="save" style={{ flex: 1, background: "var(--green)", fontSize: 12.5, padding: "9px 4px" }} onClick={onOpenBackupImport}>📥 นำเข้า</button>
           </div>
           <div className="hint" style={{ marginBottom: 0 }}>ใช้เพื่อย้าย/สำรองข้อมูลทั้งหมดของกลุ่มนี้</div>
+        </div>
+
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
+          <div className="hint" style={{ marginTop: 0 }}>⚠️ โซนอันตราย</div>
+          <button className="save" style={{ background: "var(--pink)", fontSize: 13 }} onClick={onResetApp}>
+            🗑️ รีเซ็ตแอปกลับเป็นค่าเริ่มต้น
+          </button>
+          <div className="hint" style={{ marginBottom: 0 }}>
+            ลบรายชื่อผู้เล่น ลูกแบด และประวัติการจ่ายเงินทั้งหมดถาวร แล้วตั้งค่าราคา/ค่าตั้งค่ากลับเป็นค่าเริ่มต้น — ใช้ตอนอยากเริ่มต้นใหม่ทั้งหมด (ไม่ใช่แค่จบรอบ)
+          </div>
         </div>
       </div>
     </div>

@@ -76,7 +76,7 @@ export function isInCurrentRound(state: AppState, s: Shuttle): boolean {
 // permanent roster names everywhere a name is shown as plain text — reports, CSV,
 // exported images, game-history strings — not just in styled UI.
 export function displayName(p: { name: string; isGuest?: boolean }): string {
-  return p.isGuest ? `🎫 ${p.name}` : p.name;
+  return p.isGuest ? `${p.name} 😎` : p.name;
 }
 
 export function rosterName(state: AppState, id: number): string {

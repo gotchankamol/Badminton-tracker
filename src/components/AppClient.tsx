@@ -20,6 +20,7 @@ import PromptModal, { type PromptRequest } from "./PromptModal";
 import Toast from "./Toast";
 import Confetti from "./Confetti";
 import RoundEndCelebration from "./RoundEndCelebration";
+import ShuttleAddedCelebration from "./ShuttleAddedCelebration";
 
 export default function AppClient({ initialState }: { initialState: AppState }) {
   const sound = useSoundSettings();
@@ -46,6 +47,12 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [promptRequest, setPromptRequest] = useState<PromptRequest | null>(null);
   const [showRoundEnd, setShowRoundEnd] = useState(false);
+  const [showShuttleAdded, setShowShuttleAdded] = useState(false);
+
+  const handleShuttleAdded = useCallback(() => {
+    setShowShuttleAdded(true);
+    sound.play("notify");
+  }, [sound]);
 
   const customConfirm = useCallback((message: string) => {
     sound.play("notify");
@@ -113,6 +120,16 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
       setShowRoundEnd(true);
       sound.play("roundEnd");
     }
+  }
+
+  async function handleResetApp() {
+    const ok = await customConfirm(
+      "รีเซ็ตแอปกลับเป็นค่าเริ่มต้น? รายชื่อผู้เล่น ลูกแบด และประวัติการจ่ายเงินทั้งหมดจะถูกลบถาวร ราคาต่อลูกและค่าตั้งค่าอื่นๆ จะกลับเป็นค่าเริ่มต้น การกระทำนี้ย้อนกลับไม่ได้ (ยกเว้นกดปุ่มย้อนกลับทันทีหลังจากนี้)"
+    );
+    if (!ok) return;
+    await run(() => actions.resetApp());
+    setSettingsOpen(false);
+    showToast("รีเซ็ตแอปกลับเป็นค่าเริ่มต้นแล้ว");
   }
 
   async function handleImportBackup(json: string) {
@@ -187,6 +204,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
           onDeleteShuttle={handleDeleteShuttle}
           onAddNumberToShuttle={(shuttleId, number) => run(() => actions.addNumberToShuttle(shuttleId, number))}
           showToast={showToast}
+          onShuttleAdded={handleShuttleAdded}
         />
       ) : (
         <SummaryTab state={state} onPay={(id) => run(() => actions.payPlayer(id))} />
@@ -211,6 +229,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
         onOpenBackupImport={() => setBackupMode("import")}
         onOpenRosterExport={() => setRosterListMode("export")}
         onOpenRosterImport={() => setRosterListMode("import")}
+        onResetApp={handleResetApp}
         sound={sound}
       />
       <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} state={state} showToast={showToast} />
@@ -235,6 +254,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
       <PromptModal request={promptRequest} />
       <Toast message={toast} />
       <RoundEndCelebration show={showRoundEnd} onDone={() => setShowRoundEnd(false)} />
+      <ShuttleAddedCelebration show={showShuttleAdded} onDone={() => setShowShuttleAdded(false)} />
     </div>
   );
 }

@@ -119,12 +119,17 @@ h1 { margin: 0; font-family: var(--font-baloo); font-size: 24px; font-weight: 80
   background: var(--card); border: 2px solid var(--orange); border-radius: 12px;
   box-shadow: 3px 3px 0 rgba(43,33,64,0.2); max-height: 260px; overflow-y: auto;
 }
-.search-dropdown-item { padding: 10px 14px; font-weight: 700; font-size: 14px; cursor: pointer; border-bottom: 1px solid rgba(43,33,64,0.08); }
+.search-dropdown-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font-weight: 700; font-size: 14px; cursor: pointer; border-bottom: 1px solid rgba(43,33,64,0.08); }
 .search-dropdown-item:last-child { border-bottom: none; }
 .search-dropdown-item:hover, .search-dropdown-item:active { background: var(--orange-soft); }
 .search-dropdown-item.all-option { color: #0BAE84; }
+.search-dropdown-search { padding: 8px 10px; border-bottom: 1px solid rgba(43,33,64,0.08); }
+.search-dropdown-search input {
+  width: 100%; border: 2px solid var(--orange); border-radius: 9px; padding: 8px 10px;
+  font-family: var(--font-body); font-weight: 700; font-size: 13.5px; color: var(--ink);
+}
+.search-dropdown-search input:focus { outline: none; border-color: var(--pink); }
 .search-dropdown-empty { padding: 10px 14px; font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
-.guest-name { font-style: italic; }
 .pick-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .toggle-chip { border-radius: 20px; padding: 8px 13px; font-size: 13.5px; font-weight: 800; border: 2px solid var(--ink); cursor: pointer; opacity: 0.45; font-family: var(--font-body); }
 .toggle-chip.selected { opacity: 1; box-shadow: 2px 2px 0 rgba(43,33,64,0.25); }
@@ -210,5 +215,31 @@ textarea.mono-box { width: 100%; min-height: 180px; background: var(--blue-soft)
 }
 .roundend-label {
   font-family: var(--font-baloo); font-weight: 800; font-size: 20px; color: var(--ink); background: #fff;
+  padding: 6px 16px; border-radius: 14px; border: 3px solid var(--ink); box-shadow: 3px 3px 0 rgba(43,33,64,0.2);
+}
+
+/* Fires on every shuttle add, so it's lighter than roundend-* (no sparks) — but still
+   held on screen long enough to actually read before fading, see DISPLAY_MS. */
+@keyframes shuttleadd-pop {
+  0% { transform: scale(0); opacity: 0; }
+  55% { transform: scale(1.15); opacity: 1; }
+  75% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes shuttleadd-fadeout {
+  0%, 80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.shuttleadd-badge {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  animation: shuttleadd-pop 0.5s cubic-bezier(.34,1.56,.64,1) forwards, shuttleadd-fadeout 2.2s ease forwards;
+}
+.shuttleadd-circle {
+  width: 84px; height: 84px; border-radius: 50%; background: var(--orange); border: 4px solid var(--ink);
+  display: flex; align-items: center; justify-content: center; font-size: 42px;
+  box-shadow: 6px 6px 0 rgba(43,33,64,0.25);
+}
+.shuttleadd-label {
+  font-family: var(--font-baloo); font-weight: 800; font-size: 19px; color: var(--ink); background: #fff;
   padding: 6px 16px; border-radius: 14px; border: 3px solid var(--ink); box-shadow: 3px 3px 0 rgba(43,33,64,0.2);
 }
