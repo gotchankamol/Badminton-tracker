@@ -88,8 +88,25 @@ export async function setPresentToday(id: number) {
   return currentState();
 }
 
-export async function addAllPresentToday() {
-  await prisma.player.updateMany({ where: { isToday: false }, data: { isToday: true, hasLeft: false } });
+export async function setPresentTodayMultiple(ids: number[]) {
+  if (ids.length > 0) {
+    await prisma.player.updateMany({ where: { id: { in: ids } }, data: { isToday: true, hasLeft: false } });
+  }
+  return currentState();
+}
+
+// A guest is a real roster row (so shuttles/payments work exactly like anyone else)
+// but flagged so endRound() can quietly delete them once paid up — see
+// cleanupSettledGuests(). Names still share the same uniqueness constraint as the
+// permanent roster.
+export async function addGuestPlayer(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("กรุณาใส่ชื่อ");
+  const dup = await prisma.player.findFirst({
+    where: { name: { equals: trimmed, mode: "insensitive" } },
+  });
+  if (dup) throw new Error(`มีชื่อ "${dup.name}" อยู่แล้ว ห้ามซ้ำ`);
+  await prisma.player.create({ data: { name: trimmed, isToday: true, hasLeft: false, isGuest: true } });
   return currentState();
 }
 
@@ -182,15 +199,52 @@ export async function updateSettings(price: number, maxShuttleNumber: number, da
   return currentState();
 }
 
-// Doesn't delete anything — starts a fresh round so the Shuttles tab and Summary tab
-// only show activity from this point on. Anyone who still owes money keeps showing
-// up in the summary regardless (debt is always all-time, never scoped to a round).
+// Guests (see addGuestPlayer) are only meant to exist for the day they were added —
+// once fully paid up, quietly remove them from the roster so they don't clutter the
+// permanent player picker. Anyone still owing money is left alone (name and all) so
+// their debt is never lost; they'll get swept up on a future end-round once settled.
+async function cleanupSettledGuests() {
+  const guests = await prisma.player.findMany({ where: { isGuest: true }, include: { payments: true } });
+  if (guests.length === 0) return;
+  const settings = await ensureSettings();
+  const shuttles = await prisma.shuttle.findMany();
+
+  const toDelete = guests
+    .filter((g) => {
+      const usage = shuttles.reduce((sum, s) => {
+        const occ = s.playerIds.filter((pid) => pid === g.id).length;
+        const numCount = (s.numbers && s.numbers.length) || 1;
+        return sum + occ * numCount;
+      }, 0);
+      const paid = g.payments.reduce((sum, pay) => sum + pay.amount, 0);
+      return usage * settings.price - paid <= 0;
+    })
+    .map((g) => g.id);
+  if (toDelete.length === 0) return;
+
+  const affectedShuttles = shuttles.filter((s) => s.playerIds.some((pid) => toDelete.includes(pid)));
+  await prisma.$transaction([
+    ...affectedShuttles.map((s) =>
+      prisma.shuttle.update({
+        where: { id: s.id },
+        data: { playerIds: s.playerIds.filter((pid) => !toDelete.includes(pid)) },
+      })
+    ),
+    prisma.player.deleteMany({ where: { id: { in: toDelete } } }),
+  ]);
+}
+
+// Doesn't delete anything (except settled guests, see cleanupSettledGuests) — starts a
+// fresh round so the Shuttles tab and Summary tab only show activity from this point
+// on. Anyone who still owes money keeps showing up in the summary regardless (debt is
+// always all-time, never scoped to a round).
 export async function endRound() {
   await ensureSettings();
   await prisma.$transaction([
     prisma.player.updateMany({ data: { isToday: false, hasLeft: false } }),
     prisma.settings.update({ where: { id: 1 }, data: { roundStartAt: new Date() } }),
   ]);
+  await cleanupSettledGuests();
   return currentState();
 }
 
@@ -207,6 +261,7 @@ async function replaceAllData(state: Omit<AppState, "currentRoundStart">) {
           name: p.name,
           isToday: p.isToday,
           hasLeft: p.hasLeft,
+          isGuest: p.isGuest,
           payments: {
             create: p.payments.map((pay) => ({
               id: pay.id,
@@ -298,6 +353,7 @@ function normalizeBackup(parsed: BackupData): Omit<AppState, "currentRoundStart"
     name: p.name,
     isToday: todayIds.includes(p.id),
     hasLeft: leftTodayIds.includes(p.id),
+    isGuest: false,
     payments: (p.payments || []).map((pay, i) => ({
       id: i + 1,
       amount: pay.amount,

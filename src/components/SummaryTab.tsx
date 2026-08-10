@@ -20,17 +20,34 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
   const activeThisRound = playerActiveInCurrentRound(state, p.id);
   const lifetimeCount = playerUsage(state, p.id);
   const roundCount = playerRoundUsage(state, p.id);
-  // Carried-over/cleared-old-debt rows never played this round, so their headline is
-  // their (old) lifetime total; rows active this round show only this round's count —
-  // otherwise the number would keep growing forever across every round ever played.
-  const count = activeThisRound ? roundCount : lifetimeCount;
-  const total = count * state.settings.price;
   const owed = playerOwed(state, p);
   const settled = isSettled(state, p);
   const { groups, unpaid } = playerPaymentBreakdown(state, p);
+  const unpaidCount = unpaid.reduce((sum, cg) => sum + cg.unitsCovered, 0);
   const { oldOwed, roundOwed } = playerOwedSplit(state, p);
   const hasDetails = groups.length > 0 || unpaid.length > 0;
-  const pamt = settled ? total : (activeThisRound ? roundOwed : owed);
+  const lastPayment = p.payments && p.payments.length > 0 ? p.payments[p.payments.length - 1] : null;
+
+  let count: number;
+  let pamt: number;
+  if (activeThisRound) {
+    // Active this round: headline is this round's count/amount only — otherwise the
+    // number would keep growing forever across every round ever played.
+    count = roundCount;
+    pamt = settled ? roundCount * state.settings.price : roundOwed;
+  } else if (settled) {
+    // Not active this round but settled only happens via playerJustClearedOldDebt —
+    // show what that specific payment actually cleared, not the lifetime total (which
+    // would include balls paid off in unrelated payments long before this round).
+    count = lastPayment?.shuttleCount ?? lifetimeCount;
+    pamt = lastPayment?.amount ?? lifetimeCount * state.settings.price;
+  } else {
+    // Carried-over debt: show only the unpaid ball count so it lines up with the
+    // amount due next to it, instead of a lifetime count that also includes balls
+    // paid off long ago.
+    count = unpaidCount;
+    pamt = owed;
+  }
 
   // If a payment made during this round covered more shuttles than this round actually
   // has, the extra must have been old (pre-round) debt getting swept up in the same
@@ -54,7 +71,7 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
     <div className="player-block">
       <div className={`player-row${settled ? " is-paid" : ""}`}>
         <div className="pname" onClick={() => hasDetails && setShowDetails((v) => !v)}>
-          {p.name}
+          <span className={p.isGuest ? "guest-name" : undefined}>{p.isGuest && "🎫 "}{p.name}</span>
           {clearedOldDebt && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" }}> (จ่ายยอดค้างวันก่อน)</span>}
           {oldDebtClearedAmount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" }}> (+ เคลียร์ค้างเก่า {oldDebtClearedAmount}บ.)</span>}
         </div>

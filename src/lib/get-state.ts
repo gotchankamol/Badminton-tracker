@@ -49,6 +49,7 @@ export async function getState(): Promise<AppState> {
       name: p.name,
       isToday: p.isToday,
       hasLeft: p.hasLeft,
+      isGuest: p.isGuest,
       payments: p.payments.map((pay) => ({
         id: pay.id,
         amount: pay.amount,

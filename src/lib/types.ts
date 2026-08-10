@@ -10,6 +10,10 @@ export type Player = {
   name: string;
   isToday: boolean;
   hasLeft: boolean;
+  // Ad-hoc guest added just for today, not saved to the permanent roster picker.
+  // Auto-removed on "end round" once fully paid up; kept around otherwise so their
+  // debt never gets lost.
+  isGuest: boolean;
   payments: Payment[];
 };
 

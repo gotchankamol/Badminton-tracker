@@ -12,6 +12,7 @@ model Player {
   name      String    @unique
   isToday   Boolean   @default(false)
   hasLeft   Boolean   @default(false)
+  isGuest   Boolean   @default(false)
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   payments  Payment[]
 }

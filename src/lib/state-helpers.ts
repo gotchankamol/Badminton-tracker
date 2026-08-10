@@ -72,9 +72,16 @@ export function isInCurrentRound(state: AppState, s: Shuttle): boolean {
   return new Date(s.createdAt) >= new Date(state.currentRoundStart);
 }
 
+// Marks ad-hoc guest names (see Player.isGuest) so they read differently from
+// permanent roster names everywhere a name is shown as plain text — reports, CSV,
+// exported images, game-history strings — not just in styled UI.
+export function displayName(p: { name: string; isGuest?: boolean }): string {
+  return p.isGuest ? `🎫 ${p.name}` : p.name;
+}
+
 export function rosterName(state: AppState, id: number): string {
   const p = state.roster.find((pl) => pl.id === id);
-  return p ? p.name : "?";
+  return p ? displayName(p) : "?";
 }
 
 export function sortedRoster(state: AppState): Player[] {
@@ -258,7 +265,7 @@ export function buildReportData(state: AppState): ReportRow[] {
       const total = count * state.settings.price;
       const paid = Math.min(paidTotal(p), total);
       const owed = Math.max(0, total - paid);
-      return { name: p.name, count, total, paid, owed, paymentsCount: (p.payments || []).length };
+      return { name: displayName(p), count, total, paid, owed, paymentsCount: (p.payments || []).length };
     })
     .filter((r) => r.count > 0 || r.paid > 0);
 }
@@ -284,7 +291,7 @@ export function buildDayReportData(state: AppState, dateStr: string): ReportRow[
           const occ = s.playerIds.filter((pid) => pid === p.id).length;
           count += occ * shuttleUnitCount(s);
         });
-      return { name: p.name, count, total: count * state.settings.price, paid: 0, owed: 0, paymentsCount: 0 };
+      return { name: displayName(p), count, total: count * state.settings.price, paid: 0, owed: 0, paymentsCount: 0 };
     })
     .filter((r) => r.count > 0);
 }

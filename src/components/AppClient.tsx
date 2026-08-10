@@ -165,7 +165,8 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
         onEditPlayer={handleEditPlayer}
         onDeletePlayer={handleDeletePlayer}
         onSetPresent={(id) => run(() => actions.setPresentToday(id))}
-        onAddAllPresent={() => run(() => actions.addAllPresentToday())}
+        onSetPresentMultiple={(ids) => run(() => actions.setPresentTodayMultiple(ids))}
+        onAddGuest={(name) => run(() => actions.addGuestPlayer(name))}
         onRemoveToday={(id) => run(() => actions.removeFromToday(id))}
         onClearToday={handleClearToday}
       />

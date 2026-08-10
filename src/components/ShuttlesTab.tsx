@@ -136,11 +136,15 @@ export default function ShuttlesTab({
         <div className="pick-grid">
           {todayIds.map((id) => {
             const nm = rosterName(state, id);
+            const isGuest = state.roster.find((p) => p.id === id)?.isGuest;
             const col = chipColor(nm);
             const s = validShares[String(id)] || 0;
-            const style = s > 0
-              ? { background: col.border, borderColor: col.border, color: "#fff" }
-              : { background: col.bg, borderColor: col.border, color: "var(--ink)" };
+            const style = {
+              ...(s > 0
+                ? { background: col.border, borderColor: col.border, color: "#fff" }
+                : { background: col.bg, borderColor: col.border, color: "var(--ink)" }),
+              fontStyle: isGuest ? "italic" as const : undefined,
+            };
             return (
               <button type="button" key={id} className={`toggle-chip${s > 0 ? " selected" : ""}`} style={style} onClick={() => togglePick(id)}>
                 {s > 0 ? `${nm} ×${s}` : nm}
