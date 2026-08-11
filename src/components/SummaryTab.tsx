@@ -106,6 +106,7 @@ export default function SummaryTab({ state, onPay }: { state: AppState; onPay: (
   const carriedOver = state.roster
     .filter((p) => playerOwed(state, p) > 0 && !playerActiveInCurrentRound(state, p.id))
     .sort(sortByUsage);
+  const carriedOverTotal = carriedOver.reduce((sum, p) => sum + playerOwed(state, p), 0);
 
   const roundPlayers = state.roster.filter((p) => playerActiveInCurrentRound(state, p.id)).sort(sortByRoundUsage);
   const unpaid = roundPlayers.filter((p) => !isSettled(state, p));
@@ -123,7 +124,10 @@ export default function SummaryTab({ state, onPay }: { state: AppState; onPay: (
     <div>
       {carriedOver.length > 0 && (
         <div className="card">
-          <div className="card-title">🔴 ผู้เล่นค้างจ่าย</div>
+          <div className="card-title" style={{ justifyContent: "space-between" }}>
+            <span>🔴 ผู้เล่นค้างจ่าย</span>
+            <span style={{ fontSize: 13, color: "var(--pink)" }}>รวม {carriedOverTotal} บ.</span>
+          </div>
           {carriedOver.map((p) => <PlayerRow key={p.id} state={state} p={p} onPay={onPay} />)}
         </div>
       )}

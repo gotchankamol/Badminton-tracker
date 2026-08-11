@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { AppState } from "@/lib/types";
 import { buildDayReportData, formatThaiDate, shuttleUnitCount, todayDateStr } from "@/lib/state-helpers";
 
-export default function HistoryModal({ open, onClose, state, showToast }: { open: boolean; onClose: () => void; state: AppState; showToast: (msg: string) => void }) {
+export default function HistoryModal({ open, onClose, state, showToast }: { open: boolean; onClose: () => void; state: AppState; showToast: (msg: string, isError?: boolean) => void }) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const dateCounts = useMemo(() => {
@@ -41,7 +41,7 @@ export default function HistoryModal({ open, onClose, state, showToast }: { open
       await navigator.clipboard.writeText(text);
       showToast("คัดลอกแล้ว");
     } catch {
-      showToast("คัดลอกอัตโนมัติไม่สำเร็จ — เลือกข้อความในช่องแล้วคัดลอกเองได้เลย");
+      showToast("คัดลอกอัตโนมัติไม่สำเร็จ — เลือกข้อความในช่องแล้วคัดลอกเองได้เลย", true);
     }
   }
 

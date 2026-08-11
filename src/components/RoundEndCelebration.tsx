@@ -6,14 +6,18 @@ const CORNERS: Array<React.CSSProperties> = [
   { top: "10%", left: "12%" },
   { top: "10%", right: "12%" },
   { bottom: "16%", left: "18%" },
+  { bottom: "16%", right: "18%" },
 ];
 
 const SPARK_COLORS = ["#FF9F1C", "#FF5D8F", "#3AB0FF", "#06D6A0", "#9B6BFF", "#E8B400"];
 
+// How far and how big the corner sparks are — 3x the original size/travel distance.
+const SPARK_SCALE = 3;
+
 function makeSparks(count: number) {
   return Array.from({ length: count }, (_, i) => {
     const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
-    const dist = 34 + Math.random() * 26;
+    const dist = (34 + Math.random() * 26) * SPARK_SCALE;
     return {
       id: i,
       dx: Math.cos(angle) * dist,
@@ -47,8 +51,8 @@ export default function RoundEndCelebration({ show, onDone }: { show: boolean; o
               style={
                 {
                   position: "absolute",
-                  width: 7,
-                  height: 7,
+                  width: 7 * SPARK_SCALE,
+                  height: 7 * SPARK_SCALE,
                   borderRadius: "50%",
                   background: p.color,
                   animation: `roundend-spark 1.8s ease-out ${p.delay}s forwards`,

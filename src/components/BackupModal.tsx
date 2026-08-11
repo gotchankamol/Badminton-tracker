@@ -17,7 +17,7 @@ export default function BackupModal({
   onClose: () => void;
   state: AppState;
   onImport: (json: string) => Promise<void>;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, isError?: boolean) => void;
   onConfirm: (message: string) => Promise<boolean>;
 }) {
   const [importText, setImportText] = useState("");
@@ -41,7 +41,7 @@ export default function BackupModal({
       await navigator.clipboard.writeText(exportText);
       showToast("คัดลอกข้อมูลสำรองแล้ว");
     } catch {
-      showToast("คัดลอกอัตโนมัติไม่สำเร็จ — เลือกข้อความในช่องแล้วคัดลอกเองได้เลย");
+      showToast("คัดลอกอัตโนมัติไม่สำเร็จ — เลือกข้อความในช่องแล้วคัดลอกเองได้เลย", true);
     }
   }
 

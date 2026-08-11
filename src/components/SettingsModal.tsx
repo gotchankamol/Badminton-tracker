@@ -2,14 +2,18 @@
 
 import { useState } from "react";
 import type { AppState } from "@/lib/types";
-import { SOUND_THEME_LABELS, type SoundTheme } from "@/lib/sound";
+import { SOUND_THEME_LABELS, SOUND_VOLUME_LABELS, type SoundKind, type SoundTheme, type SoundVolume } from "@/lib/sound";
 
 type SoundControls = {
   enabled: boolean;
   theme: SoundTheme;
+  volume: SoundVolume;
+  vibrationEnabled: boolean;
   setEnabled: (v: boolean) => void;
   setTheme: (t: SoundTheme) => void;
-  play: (kind: "click" | "notify" | "roundEnd") => void;
+  setVolume: (v: SoundVolume) => void;
+  setVibrationEnabled: (v: boolean) => void;
+  play: (kind: SoundKind) => void;
 };
 
 export default function SettingsModal({
@@ -53,6 +57,14 @@ export default function SettingsModal({
   const [resetEnabled, setResetEnabled] = useState(state.settings.dayResetEnabled);
 
   if (!open) return null;
+
+  function playSoundDemo() {
+    sound.play("click");
+    setTimeout(() => sound.play("notify"), 220);
+    setTimeout(() => sound.play("success"), 500);
+    setTimeout(() => sound.play("error"), 1000);
+    setTimeout(() => sound.play("roundEnd"), 1500);
+  }
 
   return (
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -110,7 +122,6 @@ export default function SettingsModal({
               onChange={(e) => setMaxNum(parseInt(e.target.value, 10))}
               onBlur={() => onUpdateSettings(price, isNaN(maxNum) || maxNum < 1 ? 12 : Math.min(maxNum, 120), resetHour, resetEnabled)}
             />
-            <span>เลข</span>
           </div>
         </div>
         <div className="price-row" style={{ marginTop: 10 }}>
@@ -172,7 +183,7 @@ export default function SettingsModal({
               disabled={!sound.enabled}
               onChange={(e) => {
                 sound.setTheme(e.target.value as SoundTheme);
-                setTimeout(() => sound.play("notify"), 50);
+                setTimeout(playSoundDemo, 50);
               }}
             >
               {(Object.keys(SOUND_THEME_LABELS) as SoundTheme[]).map((t) => (
@@ -180,20 +191,47 @@ export default function SettingsModal({
               ))}
             </select>
           </div>
-          <button
-            className="save"
-            disabled={!sound.enabled}
-            style={{ marginTop: 10, background: "var(--blue)", fontSize: 12.5, padding: "8px 4px" }}
-            onClick={() => {
-              sound.play("click");
-              setTimeout(() => sound.play("notify"), 220);
-              setTimeout(() => sound.play("roundEnd"), 500);
-            }}
-          >
-            🔊 ทดลองฟัง
-          </button>
-          <div className="hint" style={{ marginBottom: 0 }}>
-            ตั้งค่าเสียงนี้เฉพาะเครื่องนี้เท่านั้น ไม่กระทบคนอื่นที่เปิดลิงก์เดียวกัน
+          <div style={{ marginTop: 10, opacity: sound.enabled ? 1 : 0.4 }}>
+            <label style={{ fontSize: 13, fontWeight: 700, display: "block", marginBottom: 6 }}>ระดับเสียง</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {(Object.keys(SOUND_VOLUME_LABELS) as SoundVolume[]).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  disabled={!sound.enabled}
+                  onClick={() => {
+                    sound.setVolume(v);
+                    setTimeout(() => sound.play("notify"), 50);
+                  }}
+                  style={{
+                    flex: 1, padding: "8px 4px", borderRadius: 10, cursor: "pointer",
+                    fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 12.5,
+                    border: sound.volume === v ? "2px solid var(--ink)" : "2px solid rgba(43,33,64,0.2)",
+                    background: sound.volume === v ? "var(--blue)" : "transparent",
+                    color: sound.volume === v ? "#fff" : "var(--ink)",
+                  }}
+                >
+                  {SOUND_VOLUME_LABELS[v]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="price-row" style={{ marginTop: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <input
+                type="checkbox"
+                checked={sound.vibrationEnabled}
+                onChange={(e) => {
+                  sound.setVibrationEnabled(e.target.checked);
+                  if (e.target.checked) setTimeout(() => sound.play("notify"), 50);
+                }}
+                style={{ width: 16, height: 16 }}
+              />
+              📳 เปิดโหมดสั่น
+            </label>
+          </div>
+          <div className="hint" style={{ marginTop: 0, marginBottom: 0 }}>
+            ใช้ได้เฉพาะมือถือ/เบราว์เซอร์ที่รองรับการสั่น (เช่น Android Chrome — iPhone/Safari ยังไม่รองรับ)
           </div>
         </div>
 

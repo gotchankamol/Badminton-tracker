@@ -17,7 +17,7 @@ export default function RosterListModal({
   onClose: () => void;
   state: AppState;
   onImport: (names: string[]) => Promise<{ added: number; skipped: string[] }>;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, isError?: boolean) => void;
 }) {
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
@@ -31,14 +31,14 @@ export default function RosterListModal({
       await navigator.clipboard.writeText(exportText);
       showToast("คัดลอกรายชื่อแล้ว");
     } catch {
-      showToast("คัดลอกอัตโนมัติไม่สำเร็จ — เลือกข้อความในช่องแล้วคัดลอกเองได้เลย");
+      showToast("คัดลอกอัตโนมัติไม่สำเร็จ — เลือกข้อความในช่องแล้วคัดลอกเองได้เลย", true);
     }
   }
 
   async function doImport() {
     const names = importText.split("\n").map((n) => n.trim()).filter(Boolean);
     if (names.length === 0) {
-      showToast("กรุณาวางรายชื่ออย่างน้อย 1 ชื่อ");
+      showToast("กรุณาวางรายชื่ออย่างน้อย 1 ชื่อ", true);
       return;
     }
     setImporting(true);

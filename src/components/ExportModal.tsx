@@ -25,7 +25,7 @@ export default function ExportModal({
   mode: ExportMode;
   onClose: () => void;
   state: AppState;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, isError?: boolean) => void;
 }) {
   const [imageUrl, setImageUrl] = useState<string>("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -149,7 +149,7 @@ export default function ExportModal({
       await navigator.clipboard.writeText(text);
       showToast("คัดลอกแล้ว วางในแชทหรือไฟล์ได้เลย");
     } catch {
-      showToast("คัดลอกอัตโนมัติไม่สำเร็จ — เลือกข้อความในช่องแล้วคัดลอกเองได้เลย");
+      showToast("คัดลอกอัตโนมัติไม่สำเร็จ — เลือกข้อความในช่องแล้วคัดลอกเองได้เลย", true);
     }
   }
 

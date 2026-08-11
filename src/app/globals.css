@@ -94,7 +94,11 @@ h1 { margin: 0; font-family: var(--font-baloo); font-size: 24px; font-weight: 80
 .shuttle-card { margin-bottom: 10px; }
 .shuttle-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .shuttle-num { background: var(--orange); color: #fff; font-family: var(--font-baloo); font-weight: 800; font-size: 15px; border-radius: 11px; padding: 6px 11px; min-width: 40px; text-align: center; border: 2px solid var(--ink); }
-.shuttle-amt { margin-left: auto; font-family: var(--font-baloo); font-size: 12.5px; color: var(--ink-soft); font-weight: 700; }
+.add-num-btn {
+  background: var(--blue-soft); color: var(--blue); font-family: var(--font-baloo); font-weight: 800; font-size: 12.5px;
+  border-radius: 11px; padding: 6px 11px; border: 2px dashed var(--blue); cursor: pointer;
+}
+.add-num-btn:active { transform: scale(0.95); }
 .del-shuttle { background: var(--pink-soft); border: 2px solid var(--pink); color: var(--pink); border-radius: 9px; width: 28px; height: 28px; font-size: 13px; cursor: pointer; }
 .del-shuttle:active { transform: scale(0.9); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -139,7 +143,7 @@ h1 { margin: 0; font-family: var(--font-baloo); font-size: 24px; font-weight: 80
 
 .status-line {
   display: flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; color: var(--ink-soft);
-  margin-bottom: 8px; white-space: nowrap; overflow-x: auto; scrollbar-width: none;
+  white-space: nowrap; overflow-x: auto; scrollbar-width: none;
 }
 .status-line::-webkit-scrollbar { display: none; }
 .status-sep { opacity: 0.45; }
@@ -150,6 +154,7 @@ button.save:disabled { opacity: 0.4; cursor: default; }
 .roster-add { display: flex; gap: 8px; margin-bottom: 12px; }
 .roster-add input { flex: 1; background: var(--blue-soft); border: 2px solid var(--blue); border-radius: 12px; padding: 10px 12px; color: var(--ink); font-size: 14px; font-weight: 600; min-width: 0; }
 .roster-add input:focus { outline: none; border-color: var(--pink); }
+.roster-add input.roster-add-input-purple { background: var(--purple-soft); border-color: var(--purple); }
 .roster-add button { background: var(--green); border: 2px solid var(--ink); color: #fff; border-radius: 12px; padding: 0 16px; font-weight: 800; font-size: 18px; cursor: pointer; }
 .roster-row { display: flex; align-items: center; gap: 6px; padding: 9px 4px; border-bottom: 1px solid rgba(43,33,64,0.08); flex-wrap: nowrap; }
 .roster-row:last-child { border-bottom: none; }
@@ -214,8 +219,8 @@ textarea.mono-box { width: 100%; min-height: 180px; background: var(--blue-soft)
   box-shadow: 6px 6px 0 rgba(43,33,64,0.25);
 }
 .roundend-label {
-  font-family: var(--font-baloo); font-weight: 800; font-size: 20px; color: var(--ink); background: #fff;
-  padding: 6px 16px; border-radius: 14px; border: 3px solid var(--ink); box-shadow: 3px 3px 0 rgba(43,33,64,0.2);
+  font-family: var(--font-baloo); font-weight: 800; font-size: 40px; color: var(--ink); background: #fff;
+  padding: 12px 32px; border-radius: 22px; border: 4px solid var(--ink); box-shadow: 5px 5px 0 rgba(43,33,64,0.2);
 }
 
 /* Fires on every shuttle add, so it's lighter than roundend-* (no sparks) — but still

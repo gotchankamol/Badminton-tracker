@@ -23,7 +23,7 @@ export default function ShuttlesTab({
   onAddShuttle: (number: string, shares: Record<string, number>) => void;
   onDeleteShuttle: (id: number, orderIndex: number) => void;
   onAddNumberToShuttle: (shuttleId: number, number: string) => void;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, isError?: boolean) => void;
   onShuttleAdded: () => void;
 }) {
   const [selectedNumber, setSelectedNumber] = useState<string>("");
@@ -53,11 +53,11 @@ export default function ShuttlesTab({
 
   function handleSave() {
     if (!selectedNumber) {
-      showToast("กรุณาเลือกหมายเลขลูกก่อน");
+      showToast("กรุณาเลือกหมายเลขลูกก่อน", true);
       return;
     }
     if (total !== 4) {
-      showToast(`ยอดรวมจำนวนที่แต่ละคนจ่ายต้องเท่ากับ 4 (ตอนนี้รวมได้ ${total}) กรุณาแตะปรับจำนวนของแต่ละคนให้ครบก่อนบันทึก`);
+      showToast(`ยอดรวมจำนวนที่แต่ละคนจ่ายต้องเท่ากับ 4 (ตอนนี้รวมได้ ${total}) กรุณาแตะปรับจำนวนของแต่ละคนให้ครบก่อนบันทึก`, true);
       return;
     }
     onAddShuttle(selectedNumber, validShares);
@@ -198,9 +198,6 @@ export default function ShuttlesTab({
         <div>
           {shuttlesToShow.map((s) => {
             const grouped = groupPlayerIds(s.playerIds);
-            const numCount = shuttleUnitCount(s);
-            const totalShares = s.playerIds.length * numCount;
-            const baseComplete = s.playerIds.length === 4;
             let timeStr = "";
             if (s.createdAt) {
               const dt = new Date(s.createdAt);
@@ -210,14 +207,32 @@ export default function ShuttlesTab({
             return (
               <div className="card shuttle-card" key={s.id}>
                 <div className="shuttle-head">
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", flex: 1 }}>
                     <span style={{ fontSize: 11, color: "var(--ink-soft)", fontWeight: 800, marginRight: 2 }}>รายการที่ {orderMap[s.id]}</span>
                     {(s.numbers || []).map((n, i) => <span className="shuttle-num" key={i}>#{n}</span>)}
+                    <button type="button" className="add-num-btn" onClick={() => setAddNumOpenFor(addNumOpen ? null : s.id)}>+ เพิ่มลูก</button>
                   </div>
-                  <div className="shuttle-amt" style={{ color: baseComplete ? "var(--ink-soft)" : "var(--pink)" }}>{totalShares} ส่วน × {state.settings.price} บ.</div>
                   <button className="del-shuttle" onClick={() => onDeleteShuttle(s.id, orderMap[s.id])}>✕</button>
                 </div>
-                {timeStr && <div style={{ fontSize: 10.5, color: "var(--ink-soft)", fontWeight: 600, margin: "-4px 0 9px" }}>🕐 {timeStr}</div>}
+                {addNumOpen && (
+                  <select
+                    className="num-select"
+                    style={{ marginTop: 0, marginBottom: 10 }}
+                    value=""
+                    onChange={(e) => {
+                      const n = e.target.value;
+                      if (!n) return;
+                      onAddNumberToShuttle(s.id, n);
+                      setAddNumOpenFor(null);
+                      onShuttleAdded();
+                    }}
+                  >
+                    <option value="">— เลือกหมายเลข —</option>
+                    {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>หมายเลข {n}</option>
+                    ))}
+                  </select>
+                )}
                 <div className="chips">
                   {grouped.map((g) => {
                     const nm = rosterName(state, g.id);
@@ -229,28 +244,7 @@ export default function ShuttlesTab({
                     );
                   })}
                 </div>
-                <div style={{ marginTop: 9, paddingTop: 9, borderTop: "2px dashed rgba(43,33,64,0.12)" }}>
-                  <span className="link" onClick={() => setAddNumOpenFor(addNumOpen ? null : s.id)}>+ เพิ่มหมายเลขลูก (คนกลุ่มนี้)</span>
-                  {addNumOpen && (
-                    <select
-                      className="num-select"
-                      style={{ marginTop: 8, marginBottom: 0 }}
-                      value=""
-                      onChange={(e) => {
-                        const n = e.target.value;
-                        if (!n) return;
-                        onAddNumberToShuttle(s.id, n);
-                        setAddNumOpenFor(null);
-                        onShuttleAdded();
-                      }}
-                    >
-                      <option value="">— เลือกหมายเลข —</option>
-                      {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
-                        <option key={n} value={n}>หมายเลข {n}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                {timeStr && <div style={{ fontSize: 10.5, color: "var(--ink-soft)", fontWeight: 600, textAlign: "right", marginTop: 9 }}>🕐 {timeStr}</div>}
               </div>
             );
           })}

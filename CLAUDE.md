@@ -25,6 +25,7 @@ Phone/LAN access: `next.config.ts` allowlists a hardcoded LAN IP (`allowedDevOri
 - **Undo/redo**: client-side snapshot stack in `src/lib/use-app-state.ts`; `undo`/`redo` call the `restoreState` server action, which wipes and recreates all rows from the JSON snapshot. Any field that should survive undo must be part of the client-visible `AppState` type.
 - **Sound settings** live in `localStorage` (`src/lib/use-sound-settings.ts`), not the shared DB — it's a personal per-device preference, unlike everything else in this app which is shared group state.
 - `mcp__visualize__show_widget` does not render for this user (confirmed repeatedly) — present visual choices via `AskUserQuestion` (≤4 options) or a plain numbered list in chat (>4 options), never the visualize tool.
+- **Concurrent requests can trip `PrismaClientKnownRequestError: bind message supplies N parameters, but prepared statement "" requires 0`** — seen when 2+ browser tabs (or a HEAD+GET dev-mode prefetch race) hit `getState()` at the same moment. Self-heals on the very next request; it is not a real bug and does not need `prisma dev`/`npm run dev` restarted. Only chase it if it persists across several sequential (non-concurrent) requests.
 
 ## Testing in the browser tool
 
@@ -32,6 +33,9 @@ Phone/LAN access: `next.config.ts` allowlists a hardcoded LAN IP (`allowedDevOri
 - Console messages persist stale entries across navigations in this browser tool — cross-check against the dev server's live log output, or open a fresh tab.
 - For timing-sensitive checks (animations, debounced UI), do the whole wait-and-check sequence inside one `javascript_exec` call using an internal `await new Promise(r => setTimeout(...))` — separate tool calls have unpredictable inter-call latency.
 - Clean up any test data (roster names, shuttle entries) created during verification, e.g. via the app's own undo button.
+- **Keep only one browser tab open against the dev server at a time** — extra tabs left open from earlier in the session are the main real-world trigger for the concurrent-request Prisma error above, and burn a lot of turns if mistaken for a code bug.
+- **For fixtures the UI can't create directly** (e.g. a shuttle backdated to before the current round, to test carried-over-debt display), a disposable `pg` script against `DATABASE_URL` is fine — insert/delete directly, using a `🧪`-prefixed guest name so it's unambiguous test data, and delete it (and any shuttles referencing it) when done. This is faster and less noisy than trying to force the same state through the UI.
+- For low-risk changes (copy tweaks, reordering a list, removing a hint) a `tsc --noEmit` pass plus one targeted `page.textContent.includes(...)` check is enough — don't repeat the full multi-scenario browser pass from a bigger feature for every follow-up tweak to it.
 
 ## Deployment
 

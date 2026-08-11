@@ -5,6 +5,7 @@ import * as actions from "@/lib/actions";
 import { useAppState } from "@/lib/use-app-state";
 import { useSoundSettings } from "@/lib/use-sound-settings";
 import type { AppState } from "@/lib/types";
+import { playerOwed } from "@/lib/state-helpers";
 import Header from "./Header";
 import RosterCard from "./RosterCard";
 import ShuttlesTab from "./ShuttlesTab";
@@ -27,14 +28,15 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
 
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showToast = useCallback((msg: string) => {
+  const showToast = useCallback((msg: string, isError = false) => {
     setToast(msg);
-    sound.play("notify");
+    sound.play(isError ? "error" : "notify");
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3200);
   }, [sound]);
+  const showError = useCallback((msg: string) => showToast(msg, true), [showToast]);
 
-  const { state, run, runBlocked, undo, redo, canUndo, canRedo } = useAppState(initialState, showToast);
+  const { state, run, runBlocked, undo, redo, canUndo, canRedo } = useAppState(initialState, showError);
 
   const [tab, setTab] = useState<"shuttles" | "summary">("shuttles");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -47,12 +49,22 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [promptRequest, setPromptRequest] = useState<PromptRequest | null>(null);
   const [showRoundEnd, setShowRoundEnd] = useState(false);
-  const [showShuttleAdded, setShowShuttleAdded] = useState(false);
+  const [celebration, setCelebration] = useState<{ text: string; icon: string } | null>(null);
 
   const handleShuttleAdded = useCallback(() => {
-    setShowShuttleAdded(true);
-    sound.play("notify");
+    setCelebration({ text: "เพิ่มลูกใหม่แล้ว!", icon: "🏸" });
+    sound.play("success");
   }, [sound]);
+
+  async function handlePayPlayer(id: number) {
+    const p = state.roster.find((pl) => pl.id === id);
+    const wasOwing = p ? playerOwed(state, p) > 0 : false;
+    const result = await run(() => actions.payPlayer(id));
+    if (result && wasOwing) {
+      setCelebration({ text: "จ่ายเงินแล้ว!", icon: "💰" });
+      sound.play("success");
+    }
+  }
 
   const customConfirm = useCallback((message: string) => {
     sound.play("notify");
@@ -77,7 +89,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
     if (!p) return;
     const newName = await customPrompt("แก้ไขชื่อผู้เล่น", p.name);
     if (newName === null) return;
-    if (!newName.trim()) { showToast("กรุณาใส่ชื่อ"); return; }
+    if (!newName.trim()) { showToast("กรุณาใส่ชื่อ", true); return; }
     await run(() => actions.editRosterPlayer(id, newName));
   }
 
@@ -96,7 +108,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
     if (state.roster.filter((p) => p.isToday).length === 0) return;
     const result = await runBlocked(() => actions.clearToday());
     if (result && result.blockedNames.length > 0) {
-      showToast(`ล้างรายชื่อบางส่วนไม่ได้เพราะยังไม่ได้จ่ายเงิน: ${result.blockedNames.join(", ")}`);
+      showToast(`ล้างรายชื่อบางส่วนไม่ได้เพราะยังไม่ได้จ่ายเงิน: ${result.blockedNames.join(", ")}`, true);
     }
   }
 
@@ -207,7 +219,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
           onShuttleAdded={handleShuttleAdded}
         />
       ) : (
-        <SummaryTab state={state} onPay={(id) => run(() => actions.payPlayer(id))} />
+        <SummaryTab state={state} onPay={handlePayPlayer} />
       )}
 
       <div className="note">
@@ -254,7 +266,12 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
       <PromptModal request={promptRequest} />
       <Toast message={toast} />
       <RoundEndCelebration show={showRoundEnd} onDone={() => setShowRoundEnd(false)} />
-      <ShuttleAddedCelebration show={showShuttleAdded} onDone={() => setShowShuttleAdded(false)} />
+      <ShuttleAddedCelebration
+        show={celebration !== null}
+        text={celebration?.text ?? ""}
+        icon={celebration?.icon}
+        onDone={() => setCelebration(null)}
+      />
     </div>
   );
 }
