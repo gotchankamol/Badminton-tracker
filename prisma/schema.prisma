@@ -44,3 +44,31 @@ model Settings {
   dayResetEnabled  Boolean   @default(true)
   roundStartAt     DateTime? @db.Timestamptz(3)
 }
+
+model AccessCode {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique
+  label     String
+  maxUses   Int?
+  isOwner   Boolean   @default(false)
+  revoked   Boolean   @default(false)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  visitors  Visitor[]
+}
+
+model Visitor {
+  id           Int        @id @default(autoincrement())
+  token        String     @unique
+  nickname     String
+  accessCodeId Int
+  accessCode   AccessCode @relation(fields: [accessCodeId], references: [id], onDelete: Cascade)
+  revoked      Boolean    @default(false)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  lastSeenAt   DateTime   @default(now()) @db.Timestamptz(3)
+}
+
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  ip        String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}

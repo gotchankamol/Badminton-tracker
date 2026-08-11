@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as actions from "@/lib/actions";
+import { heartbeat } from "@/lib/session-actions";
 import { useAppState } from "@/lib/use-app-state";
 import { useSoundSettings } from "@/lib/use-sound-settings";
 import type { AppState } from "@/lib/types";
@@ -23,8 +24,23 @@ import Confetti from "./Confetti";
 import RoundEndCelebration from "./RoundEndCelebration";
 import ShuttleAddedCelebration from "./ShuttleAddedCelebration";
 
-export default function AppClient({ initialState }: { initialState: AppState }) {
+export default function AppClient({
+  initialState,
+  session,
+}: {
+  initialState: AppState;
+  session: { nickname: string; isOwner: boolean };
+}) {
   const sound = useSoundSettings();
+
+  useEffect(() => {
+    function ping() {
+      if (document.visibilityState === "visible") heartbeat();
+    }
+    ping();
+    const interval = setInterval(ping, 25000);
+    return () => clearInterval(interval);
+  }, []);
 
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -230,6 +246,7 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         state={state}
+        isOwner={session.isOwner}
         onUpdateSettings={handleUpdateSettings}
         onEndRound={handleEndRound}
         onOpenHistory={() => { setSettingsOpen(false); setHistoryOpen(true); }}
@@ -244,8 +261,8 @@ export default function AppClient({ initialState }: { initialState: AppState }) 
         onResetApp={handleResetApp}
         sound={sound}
       />
-      <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} state={state} showToast={showToast} />
-      <PlayerHistoryModal open={playerHistoryOpen} onClose={() => setPlayerHistoryOpen(false)} state={state} />
+      <HistoryModal open={historyOpen} onClose={() => { setHistoryOpen(false); setSettingsOpen(true); }} state={state} showToast={showToast} />
+      <PlayerHistoryModal open={playerHistoryOpen} onClose={() => { setPlayerHistoryOpen(false); setSettingsOpen(true); }} state={state} />
       <ExportModal mode={exportMode} onClose={() => setExportMode(null)} state={state} showToast={showToast} />
       <BackupModal
         mode={backupMode}

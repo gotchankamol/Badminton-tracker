@@ -3,6 +3,7 @@
 import { prisma } from "./db";
 import { getState, ensureSettings } from "./get-state";
 import { paidTotal, playerOwed, playerUsage, todayDateStr } from "./state-helpers";
+import { requireSession } from "./session";
 import type { AppState, BackupData } from "./types";
 
 async function currentState(): Promise<AppState> {
@@ -10,6 +11,7 @@ async function currentState(): Promise<AppState> {
 }
 
 export async function addRosterPlayer(name: string) {
+  await requireSession();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("กรุณาใส่ชื่อ");
   const dup = await prisma.player.findFirst({
@@ -21,6 +23,7 @@ export async function addRosterPlayer(name: string) {
 }
 
 export async function importRosterNames(names: string[]) {
+  await requireSession();
   const existing = await prisma.player.findMany({ select: { name: true } });
   const existingLower = new Set(existing.map((p) => p.name.toLowerCase()));
 
@@ -50,6 +53,7 @@ export async function importRosterNames(names: string[]) {
 }
 
 export async function editRosterPlayer(id: number, name: string) {
+  await requireSession();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("กรุณาใส่ชื่อ");
   const dup = await prisma.player.findFirst({
@@ -61,6 +65,7 @@ export async function editRosterPlayer(id: number, name: string) {
 }
 
 export async function deleteRosterPlayer(id: number) {
+  await requireSession();
   const state = await currentState();
   const p = state.roster.find((pl) => pl.id === id);
   if (!p) return currentState();
@@ -84,11 +89,13 @@ export async function deleteRosterPlayer(id: number) {
 }
 
 export async function setPresentToday(id: number) {
+  await requireSession();
   await prisma.player.update({ where: { id }, data: { isToday: true, hasLeft: false } });
   return currentState();
 }
 
 export async function setPresentTodayMultiple(ids: number[]) {
+  await requireSession();
   if (ids.length > 0) {
     await prisma.player.updateMany({ where: { id: { in: ids } }, data: { isToday: true, hasLeft: false } });
   }
@@ -100,6 +107,7 @@ export async function setPresentTodayMultiple(ids: number[]) {
 // cleanupSettledGuests(). Names still share the same uniqueness constraint as the
 // permanent roster.
 export async function addGuestPlayer(name: string) {
+  await requireSession();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("กรุณาใส่ชื่อ");
   const dup = await prisma.player.findFirst({
@@ -111,6 +119,7 @@ export async function addGuestPlayer(name: string) {
 }
 
 export async function removeFromToday(id: number) {
+  await requireSession();
   const state = await currentState();
   const p = state.roster.find((pl) => pl.id === id);
   if (p) {
@@ -126,6 +135,7 @@ export async function removeFromToday(id: number) {
 }
 
 export async function clearToday() {
+  await requireSession();
   const state = await currentState();
   const present = state.roster.filter((p) => p.isToday);
   const blocked = present.filter((p) => playerOwed(state, p) > 0);
@@ -137,6 +147,7 @@ export async function clearToday() {
 }
 
 export async function addShuttle(number: string, shares: Record<string, number>) {
+  await requireSession();
   const total = Object.values(shares).reduce((s, n) => s + n, 0);
   if (total !== 4) throw new Error(`ยอดรวมจำนวนที่แต่ละคนจ่ายต้องเท่ากับ 4 (ตอนนี้รวมได้ ${total})`);
   const playerIds: number[] = [];
@@ -151,6 +162,7 @@ export async function addShuttle(number: string, shares: Record<string, number>)
 }
 
 export async function addNumberToShuttle(shuttleId: number, number: string) {
+  await requireSession();
   await prisma.shuttle.update({
     where: { id: shuttleId },
     data: { numbers: { push: number } },
@@ -159,11 +171,13 @@ export async function addNumberToShuttle(shuttleId: number, number: string) {
 }
 
 export async function deleteShuttle(id: number) {
+  await requireSession();
   await prisma.shuttle.delete({ where: { id } });
   return currentState();
 }
 
 export async function payPlayer(id: number) {
+  await requireSession();
   const state = await currentState();
   const p = state.roster.find((pl) => pl.id === id);
   if (!p) return currentState();
@@ -188,6 +202,7 @@ export async function payPlayer(id: number) {
 }
 
 export async function updateSettings(price: number, maxShuttleNumber: number, dayResetHour: number, dayResetEnabled: boolean) {
+  await requireSession();
   const safePrice = Number.isFinite(price) ? price : 0;
   const safeMax = Number.isFinite(maxShuttleNumber) && maxShuttleNumber >= 1 ? maxShuttleNumber : 12;
   const safeHour = Number.isFinite(dayResetHour) && dayResetHour >= 0 && dayResetHour <= 23 ? Math.floor(dayResetHour) : 5;
@@ -239,6 +254,7 @@ async function cleanupSettledGuests() {
 // on. Anyone who still owes money keeps showing up in the summary regardless (debt is
 // always all-time, never scoped to a round).
 export async function endRound() {
+  await requireSession();
   await ensureSettings();
   await prisma.$transaction([
     prisma.player.updateMany({ data: { isToday: false, hasLeft: false } }),
@@ -321,6 +337,7 @@ async function replaceAllData(state: Omit<AppState, "currentRoundStart">) {
 }
 
 export async function restoreState(snapshot: AppState) {
+  await requireSession();
   await replaceAllData(snapshot);
   return currentState();
 }
@@ -378,6 +395,7 @@ function normalizeBackup(parsed: BackupData): Omit<AppState, "currentRoundStart"
 // (e.g. testing, or handing the tracker to a new group), distinct from "จบรอบ" which
 // only resets the current round and keeps all history.
 export async function resetApp() {
+  await requireSession();
   await replaceAllData({
     roster: [],
     shuttles: [],
@@ -387,6 +405,7 @@ export async function resetApp() {
 }
 
 export async function importBackup(json: string) {
+  await requireSession();
   let parsed: BackupData;
   try {
     parsed = JSON.parse(json);

@@ -2,7 +2,16 @@
 
 import { useCallback, useRef, useState } from "react";
 import { restoreState } from "./actions";
+import { SESSION_INVALID_ERROR } from "./session-shared";
 import type { AppState } from "./types";
+
+function handleSessionExpiry(e: unknown): boolean {
+  if (e instanceof Error && e.message === SESSION_INVALID_ERROR) {
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
 
 export function useAppState(initial: AppState, onError: (msg: string) => void) {
   const [state, setState] = useState<AppState>(initial);
@@ -30,6 +39,7 @@ export function useAppState(initial: AppState, onError: (msg: string) => void) {
         apply(result);
         return result;
       } catch (e) {
+        if (handleSessionExpiry(e)) return null;
         onError(e instanceof Error ? e.message : String(e));
         return null;
       }
@@ -50,6 +60,7 @@ export function useAppState(initial: AppState, onError: (msg: string) => void) {
         apply(result.state);
         return result;
       } catch (e) {
+        if (handleSessionExpiry(e)) return null;
         onError(e instanceof Error ? e.message : String(e));
         return null;
       }
@@ -63,9 +74,13 @@ export function useAppState(initial: AppState, onError: (msg: string) => void) {
     futureRef.current.push(JSON.stringify(stateRef.current));
     setHistoryLen(historyRef.current.length);
     setFutureLen(futureRef.current.length);
-    const restored = await restoreState(JSON.parse(prev));
-    apply(restored);
-  }, [apply]);
+    try {
+      const restored = await restoreState(JSON.parse(prev));
+      apply(restored);
+    } catch (e) {
+      if (!handleSessionExpiry(e)) onError(e instanceof Error ? e.message : String(e));
+    }
+  }, [apply, onError]);
 
   const redo = useCallback(async () => {
     if (futureRef.current.length === 0) return;
@@ -73,9 +88,13 @@ export function useAppState(initial: AppState, onError: (msg: string) => void) {
     historyRef.current.push(JSON.stringify(stateRef.current));
     setHistoryLen(historyRef.current.length);
     setFutureLen(futureRef.current.length);
-    const restored = await restoreState(JSON.parse(next));
-    apply(restored);
-  }, [apply]);
+    try {
+      const restored = await restoreState(JSON.parse(next));
+      apply(restored);
+    } catch (e) {
+      if (!handleSessionExpiry(e)) onError(e instanceof Error ? e.message : String(e));
+    }
+  }, [apply, onError]);
 
   return {
     state,

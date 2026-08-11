@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AppState, Player } from "@/lib/types";
+import { getPublicReport } from "@/lib/public-report";
 import {
   isSettled,
   playerActiveInCurrentRound,
@@ -14,12 +15,14 @@ import {
 } from "@/lib/state-helpers";
 import { PaymentGroupRow, UnpaidGamesList } from "./PaymentHistoryList";
 
-function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Player; onPay: (id: number) => void; clearedOldDebt?: boolean }) {
+const REFRESH_MS = 15000;
+
+function ReadOnlyPlayerRow({ state, p, clearedOldDebt }: { state: AppState; p: Player; clearedOldDebt?: boolean }) {
   const [showDetails, setShowDetails] = useState(false);
 
   const activeThisRound = playerActiveInCurrentRound(state, p.id);
-  const lifetimeCount = playerUsage(state, p.id);
   const roundCount = playerRoundUsage(state, p.id);
+  const lifetimeCount = playerUsage(state, p.id);
   const owed = playerOwed(state, p);
   const settled = isSettled(state, p);
   const { groups, unpaid } = playerPaymentBreakdown(state, p);
@@ -28,10 +31,6 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
   const hasDetails = groups.length > 0 || unpaid.length > 0;
   const lastPayment = p.payments && p.payments.length > 0 ? p.payments[p.payments.length - 1] : null;
 
-  // If a payment made during this round covered more shuttles than this round actually
-  // has, the extra must have been old (pre-round) debt getting swept up in the same
-  // payment — pay() always settles everything owed at once. Flag it so that debt
-  // doesn't just quietly vanish from view once the row shows round-only numbers.
   const roundStart = new Date(state.currentRoundStart);
   const paidThisRoundUnits = (p.payments || [])
     .filter((pay) => pay.at && new Date(pay.at) >= roundStart)
@@ -43,28 +42,16 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
   let count: number;
   let pamt: number;
   if (activeThisRound) {
-    // Active this round: headline is this round's count/amount only — otherwise the
-    // number would keep growing forever across every round ever played. But once
-    // settled, fold in any old debt that was cleared alongside this round's payment
-    // so the total shown actually matches what was collected (see oldDebtClearedAmount).
     count = roundCount;
     pamt = settled ? roundCount * state.settings.price + oldDebtClearedAmount : owed;
   } else if (settled) {
-    // Not active this round but settled only happens via playerJustClearedOldDebt —
-    // show what that specific payment actually cleared, not the lifetime total (which
-    // would include balls paid off in unrelated payments long before this round).
     count = lastPayment?.shuttleCount ?? lifetimeCount;
     pamt = lastPayment?.amount ?? lifetimeCount * state.settings.price;
   } else {
-    // Carried-over debt: show only the unpaid ball count so it lines up with the
-    // amount due next to it, instead of a lifetime count that also includes balls
-    // paid off long ago.
     count = unpaidCount;
     pamt = owed;
   }
 
-  // Only this round's payments show here — the full lifetime ledger lives in
-  // Settings → ประวัติการจ่ายเงินรายคน instead, so this stays focused on "right now."
   const recentGroups = groups
     .filter((grp) => grp.payment.at && new Date(grp.payment.at) >= roundStart)
     .map((grp, i) => ({ grp, num: i + 1 }));
@@ -76,7 +63,7 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
   return (
     <div className="player-block">
       <div className={`player-row${settled ? " is-paid" : ""}`}>
-        <div className="pname" onClick={() => hasDetails && setShowDetails((v) => !v)}>
+        <div className="pname" onClick={() => hasDetails && setShowDetails((v) => !v)} style={{ cursor: hasDetails ? "pointer" : "default" }}>
           <span>{p.name}{p.isGuest && " 😎"}</span>
           {showSplitNote && (
             <div style={{ fontSize: 11, fontWeight: 700, color: settled ? "var(--ink-soft)" : "var(--pink)" }}>รอบนี้ {splitRoundAmt} + รอบก่อน {splitOldAmt}</div>
@@ -85,7 +72,6 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
         </div>
         <div className="pcount">{count} ลูก</div>
         <div className="pamt">{pamt}</div>
-        <button className="pay-btn" onClick={() => onPay(p.id)}>{settled ? "✓" : ""}</button>
       </div>
       {showDetails && (
         <div className="pay-history">
@@ -97,54 +83,81 @@ function PlayerRow({ state, p, onPay, clearedOldDebt }: { state: AppState; p: Pl
   );
 }
 
-export default function SummaryTab({ state, onPay }: { state: AppState; onPay: (id: number) => void }) {
+export default function PublicReportView({ initialState }: { initialState: AppState }) {
+  const [state, setState] = useState<AppState>(initialState);
+  // Starts empty and fills in on mount (not via the lazy initializer) so server-rendered
+  // HTML never bakes in a timestamp that could mismatch the client's clock during hydration.
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLastSynced(new Date());
+    async function refresh() {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const fresh = await getPublicReport();
+        setState(fresh);
+        setLastSynced(new Date());
+      } catch {
+        // transient network/db hiccup — next tick retries on its own
+      }
+    }
+    timerRef.current = setInterval(refresh, REFRESH_MS);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
   const sortByUsage = (a: Player, b: Player) => playerUsage(state, b.id) - playerUsage(state, a.id);
   const sortByRoundUsage = (a: Player, b: Player) => playerRoundUsage(state, b.id) - playerRoundUsage(state, a.id);
 
-  // Debt that's still unpaid from before this round (they haven't played this round at
-  // all, but still owe money) gets its own card, separate from this round's activity —
-  // so a fresh round doesn't look "contaminated" by old stragglers, but nobody's debt
-  // ever silently disappears either.
   const carriedOver = state.roster
     .filter((p) => playerOwed(state, p) > 0 && !playerActiveInCurrentRound(state, p.id))
     .sort(sortByUsage);
-  const carriedOverTotal = carriedOver.reduce((sum, p) => sum + playerOwed(state, p), 0);
 
   const roundPlayers = state.roster.filter((p) => playerActiveInCurrentRound(state, p.id)).sort(sortByRoundUsage);
   const unpaid = roundPlayers.filter((p) => !isSettled(state, p));
-
-  // Old debtors who paid off during this round (see playerJustClearedOldDebt) join the
-  // "paid" list instead of vanishing once their carried-over balance hits zero.
   const clearedOldDebt = state.roster.filter((p) => playerJustClearedOldDebt(state, p)).sort(sortByUsage);
   const paid = roundPlayers.filter((p) => isSettled(state, p));
 
-  if (carriedOver.length === 0 && roundPlayers.length === 0 && clearedOldDebt.length === 0) {
-    return <div className="empty-msg">ยังไม่มีใครใช้ลูกแบดหรือมีประวัติจ่ายเงินเลย</div>;
-  }
+  const isEmpty = carriedOver.length === 0 && roundPlayers.length === 0 && clearedOldDebt.length === 0;
 
   return (
-    <div>
-      {unpaid.length > 0 && (
-        <div className="card">
-          <div className="card-title">💰 สรุปเงินรอบนี้</div>
-          {unpaid.map((p) => <PlayerRow key={p.id} state={state} p={p} onPay={onPay} />)}
+    <div className="wrap">
+      <header>
+        <div className="mascot" style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>📊</div>
+        <div className="title-block">
+          <div className="eyebrow">SHUTTLE LEDGER · REPORT</div>
+          <h1>รายงานการใช้ลูกแบด</h1>
+          <div className="clock">ดูอย่างเดียว · อัปเดตล่าสุด {lastSynced ? lastSynced.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "..."}</div>
         </div>
-      )}
-      {carriedOver.length > 0 && (
-        <div className="card">
-          <div className="card-title" style={{ justifyContent: "space-between" }}>
-            <span>🔴 ค้างจ่ายรอบก่อน</span>
-            <span style={{ fontSize: 13, color: "var(--pink)" }}>รวม {carriedOverTotal} บ.</span>
-          </div>
-          {carriedOver.map((p) => <PlayerRow key={p.id} state={state} p={p} onPay={onPay} />)}
-        </div>
-      )}
-      {(paid.length > 0 || clearedOldDebt.length > 0) && (
-        <div className="card">
-          <div className="card-title">✅ จ่ายเงินแล้ว</div>
-          {paid.map((p) => <PlayerRow key={p.id} state={state} p={p} onPay={onPay} />)}
-          {clearedOldDebt.map((p) => <PlayerRow key={p.id} state={state} p={p} onPay={onPay} clearedOldDebt />)}
-        </div>
+      </header>
+
+      {isEmpty ? (
+        <div className="empty-msg">ยังไม่มีใครใช้ลูกแบดหรือมีประวัติจ่ายเงินเลย</div>
+      ) : (
+        <>
+          {unpaid.length > 0 && (
+            <div className="card">
+              <div className="card-title">💰 สรุปเงินรอบนี้</div>
+              {unpaid.map((p) => <ReadOnlyPlayerRow key={p.id} state={state} p={p} />)}
+            </div>
+          )}
+          {carriedOver.length > 0 && (
+            <div className="card">
+              <div className="card-title">🔴 ค้างจ่ายรอบก่อน</div>
+              {carriedOver.map((p) => <ReadOnlyPlayerRow key={p.id} state={state} p={p} />)}
+            </div>
+          )}
+          {(paid.length > 0 || clearedOldDebt.length > 0) && (
+            <div className="card">
+              <div className="card-title">✅ จ่ายเงินแล้ว</div>
+              {paid.map((p) => <ReadOnlyPlayerRow key={p.id} state={state} p={p} />)}
+              {clearedOldDebt.map((p) => <ReadOnlyPlayerRow key={p.id} state={state} p={p} clearedOldDebt />)}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
