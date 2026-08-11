@@ -29,6 +29,7 @@ export async function getSessionOrNull(): Promise<Session | null> {
     include: { accessCode: true },
   });
   if (!visitor || visitor.revoked || visitor.accessCode.revoked) return null;
+  if (visitor.accessCode.expiresAt && visitor.accessCode.expiresAt < new Date()) return null;
 
   return {
     visitorId: visitor.id,

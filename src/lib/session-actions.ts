@@ -31,6 +31,10 @@ export async function verifyAccessCode(rawCode: string, rawNickname: string): Pr
     return { ok: false, error: "รหัสผ่านไม่ถูกต้อง" };
   }
 
+  if (accessCode.expiresAt && accessCode.expiresAt < new Date()) {
+    return { ok: false, error: "รหัสนี้หมดอายุแล้ว กรุณาติดต่อขอรหัสใหม่" };
+  }
+
   if (accessCode.maxUses != null) {
     const uses = await prisma.visitor.count({ where: { accessCodeId: accessCode.id, revoked: false } });
     if (uses >= accessCode.maxUses) {
@@ -68,6 +72,8 @@ export type AccessCodeSummary = {
   isOwner: boolean;
   revoked: boolean;
   createdAt: string;
+  expiresAt: string | null;
+  expired: boolean;
 };
 
 export async function listAccessCodes(): Promise<AccessCodeSummary[]> {
@@ -76,6 +82,7 @@ export async function listAccessCodes(): Promise<AccessCodeSummary[]> {
     include: { _count: { select: { visitors: { where: { revoked: false } } } } },
     orderBy: { createdAt: "desc" },
   });
+  const now = Date.now();
   return codes.map((c) => ({
     id: c.id,
     code: c.code,
@@ -85,10 +92,12 @@ export async function listAccessCodes(): Promise<AccessCodeSummary[]> {
     isOwner: c.isOwner,
     revoked: c.revoked,
     createdAt: c.createdAt.toISOString(),
+    expiresAt: c.expiresAt ? c.expiresAt.toISOString() : null,
+    expired: !!c.expiresAt && c.expiresAt.getTime() < now,
   }));
 }
 
-export async function createAccessCode(label: string, maxUses: number | null): Promise<AccessCodeSummary[]> {
+export async function createAccessCode(label: string, maxUses: number | null, expiresAt: string | null): Promise<AccessCodeSummary[]> {
   await requireOwnerSession();
   const trimmed = label.trim();
   if (!trimmed) throw new Error("กรุณาใส่ชื่อกำกับรหัส");
@@ -100,7 +109,39 @@ export async function createAccessCode(label: string, maxUses: number | null): P
     code = generateCode();
   }
 
-  await prisma.accessCode.create({ data: { code, label: trimmed, maxUses: maxUses ?? null } });
+  await prisma.accessCode.create({
+    data: { code, label: trimmed, maxUses: maxUses ?? null, expiresAt: expiresAt ? new Date(expiresAt) : null },
+  });
+  return listAccessCodes();
+}
+
+// expiresAt: undefined means "leave the current expiry untouched" (e.g. editing just the
+// label) — distinct from null, which explicitly clears any expiry.
+export async function updateAccessCode(
+  id: number,
+  label: string,
+  code: string,
+  maxUses: number | null,
+  expiresAt: string | null | undefined
+): Promise<AccessCodeSummary[]> {
+  await requireOwnerSession();
+  const target = await prisma.accessCode.findUnique({ where: { id } });
+  if (!target || target.isOwner) return listAccessCodes();
+
+  const trimmedLabel = label.trim();
+  if (!trimmedLabel) throw new Error("กรุณาใส่ชื่อกำกับรหัส");
+  const trimmedCode = code.trim().toUpperCase();
+  if (!trimmedCode) throw new Error("กรุณาใส่รหัสผ่าน");
+
+  const dup = await prisma.accessCode.findFirst({ where: { code: trimmedCode, id: { not: id } } });
+  if (dup) throw new Error(`รหัส "${trimmedCode}" ถูกใช้อยู่แล้ว`);
+
+  await prisma.accessCode.update({
+    where: { id },
+    data: expiresAt === undefined
+      ? { label: trimmedLabel, code: trimmedCode, maxUses: maxUses ?? null }
+      : { label: trimmedLabel, code: trimmedCode, maxUses: maxUses ?? null, expiresAt: expiresAt ? new Date(expiresAt) : null },
+  });
   return listAccessCodes();
 }
 
@@ -164,6 +205,7 @@ export type AdminSnapshot = {
     code: string;
     label: string;
     maxUses: number | null;
+    expiresAt: string | null;
     isOwner: boolean;
     revoked: boolean;
     createdAt: string;
@@ -186,7 +228,7 @@ export async function getAdminSnapshot(): Promise<AdminSnapshot> {
     prisma.visitor.findMany({ orderBy: { id: "asc" } }),
   ]);
   return {
-    codes: codes.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() })),
+    codes: codes.map((c) => ({ ...c, createdAt: c.createdAt.toISOString(), expiresAt: c.expiresAt ? c.expiresAt.toISOString() : null })),
     visitors: visitors.map((v) => ({ ...v, createdAt: v.createdAt.toISOString(), lastSeenAt: v.lastSeenAt.toISOString() })),
   };
 }
@@ -203,6 +245,7 @@ export async function restoreAdminSnapshot(snapshot: AdminSnapshot): Promise<{ c
           code: c.code,
           label: c.label,
           maxUses: c.maxUses,
+          expiresAt: c.expiresAt ? new Date(c.expiresAt) : null,
           isOwner: c.isOwner,
           revoked: c.revoked,
           createdAt: new Date(c.createdAt),

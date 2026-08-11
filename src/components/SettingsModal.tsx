@@ -6,6 +6,7 @@ import { SOUND_THEME_LABELS, SOUND_VOLUME_LABELS, type SoundKind, type SoundThem
 import {
   listAccessCodes,
   createAccessCode,
+  updateAccessCode,
   toggleAccessCode,
   deleteAccessCode,
   listVisitors,
@@ -17,6 +18,33 @@ import {
   type AdminSnapshot,
 } from "@/lib/session-actions";
 import { SESSION_INVALID_ERROR } from "@/lib/session-shared";
+
+type ExpiryPreset = "week" | "month" | "year" | "none";
+type EditExpiryChoice = "keep" | ExpiryPreset;
+
+// "หมดอายุสิ้นวัน" — whatever day the preset lands on, expiry is end-of-day (23:59:59.999),
+// not the exact time-of-day the code was created. "เดือนหน้า"/"ปีหน้า" preserve the same
+// day-of-month (clamped to the last valid day, e.g. Jan 31 + 1 month -> Feb 28/29) rather
+// than a flat +30/+365 day count, matching how most subscription billing (e.g. Stripe) works.
+function computeExpiryDate(preset: ExpiryPreset): Date | null {
+  if (preset === "none") return null;
+  const d = new Date();
+  if (preset === "week") {
+    d.setDate(d.getDate() + 7);
+  } else if (preset === "month") {
+    const day = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + 1);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(day, lastDay));
+  } else if (preset === "year") {
+    const month = d.getMonth();
+    d.setFullYear(d.getFullYear() + 1);
+    if (d.getMonth() !== month) d.setDate(0);
+  }
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
 
 type SoundControls = {
   enabled: boolean;
@@ -77,6 +105,12 @@ export default function SettingsModal({
   const [visitors, setVisitors] = useState<VisitorSummary[]>([]);
   const [newLabel, setNewLabel] = useState("");
   const [newMaxUses, setNewMaxUses] = useState("");
+  const [newExpiry, setNewExpiry] = useState<ExpiryPreset>("none");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editCode, setEditCode] = useState("");
+  const [editMaxUses, setEditMaxUses] = useState("");
+  const [editExpiry, setEditExpiry] = useState<EditExpiryChoice>("keep");
   const [adminBusy, setAdminBusy] = useState(false);
   const adminHistoryRef = useRef<AdminSnapshot[]>([]);
   const adminFutureRef = useRef<AdminSnapshot[]>([]);
@@ -124,10 +158,36 @@ export default function SettingsModal({
     setAdminBusy(true);
     await withAdminHistory(async () => {
       const maxUses = newMaxUses.trim() ? parseInt(newMaxUses, 10) : null;
-      setCodes(await createAccessCode(newLabel, Number.isFinite(maxUses) ? maxUses : null));
+      const expiresAt = computeExpiryDate(newExpiry);
+      setCodes(await createAccessCode(newLabel, Number.isFinite(maxUses) ? maxUses : null, expiresAt ? expiresAt.toISOString() : null));
     });
     setNewLabel("");
     setNewMaxUses("");
+    setNewExpiry("none");
+    setAdminBusy(false);
+  }
+
+  function startEditCode(c: AccessCodeSummary) {
+    setEditingId(c.id);
+    setEditLabel(c.label);
+    setEditCode(c.code);
+    setEditMaxUses(c.maxUses != null ? String(c.maxUses) : "");
+    setEditExpiry("keep");
+  }
+
+  function cancelEditCode() {
+    setEditingId(null);
+  }
+
+  async function handleSaveEditCode() {
+    if (editingId == null || !editLabel.trim() || !editCode.trim()) return;
+    setAdminBusy(true);
+    await withAdminHistory(async () => {
+      const maxUses = editMaxUses.trim() ? parseInt(editMaxUses, 10) : null;
+      const expiresAt = editExpiry === "keep" ? undefined : computeExpiryDate(editExpiry)?.toISOString() ?? null;
+      setCodes(await updateAccessCode(editingId, editLabel, editCode, Number.isFinite(maxUses) ? maxUses : null, expiresAt));
+    });
+    setEditingId(null);
     setAdminBusy(false);
   }
 
@@ -442,7 +502,31 @@ export default function SettingsModal({
                   style={{ flex: 1, margin: 0 }}
                 />
               </div>
-              <button className="save" style={{ marginTop: 8, background: "var(--green)", fontSize: 13.5 }} disabled={adminBusy || !newLabel.trim()} onClick={handleCreateCode}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-soft)", display: "block", marginBottom: 4 }}>หมดอายุวันที่</label>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                {([
+                  ["week", "7 วัน"],
+                  ["month", "1 เดือน"],
+                  ["year", "1 ปี"],
+                  ["none", "ไม่จำกัด"],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setNewExpiry(val)}
+                    style={{
+                      flex: 1, padding: "8px 4px", borderRadius: 10, cursor: "pointer",
+                      fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 12.5,
+                      border: newExpiry === val ? "2px solid var(--ink)" : "2px solid rgba(43,33,64,0.2)",
+                      background: newExpiry === val ? "var(--blue)" : "transparent",
+                      color: newExpiry === val ? "#fff" : "var(--ink)",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button className="save" style={{ background: "var(--green)", fontSize: 13.5 }} disabled={adminBusy || !newLabel.trim()} onClick={handleCreateCode}>
                 ➕ สร้างรหัสใหม่
               </button>
               <div className="hint" style={{ marginBottom: 0 }}>เว้นช่อง &quot;จำกัดกี่คน&quot; ไว้ว่างถ้าไม่จำกัดจำนวน</div>
@@ -452,38 +536,126 @@ export default function SettingsModal({
               <div className="hint" style={{ marginTop: 0 }}>📋 รายการรหัสผ่าน ({codes.length})</div>
               {codes.length === 0 && <div className="hint" style={{ marginTop: 0 }}>ยังไม่มีรหัสผ่าน</div>}
               {codes.map((c) => (
-                <div key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(43,33,64,0.08)", opacity: c.revoked ? 0.45 : 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 13.5 }}>{c.label}{c.isOwner ? " 👑" : ""}</div>
-                      <div style={{ fontFamily: "var(--font-baloo)", fontSize: 13, letterSpacing: "0.05em" }}>{c.code}</div>
-                      <div style={{ fontSize: 11.5, color: "var(--ink-soft)", fontWeight: 600 }}>
-                        ใช้ไปแล้ว {c.useCount}{c.maxUses != null ? ` / ${c.maxUses}` : ""} คน{c.revoked ? " · ปิดใช้งานอยู่" : ""}
+                <div key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(43,33,64,0.08)", opacity: !editingId && (c.revoked || c.expired) ? 0.45 : 1 }}>
+                  {editingId === c.id ? (
+                    <div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                        <input
+                          type="text"
+                          value={editLabel}
+                          onChange={(e) => setEditLabel(e.target.value)}
+                          placeholder="ชื่อกำกับ"
+                          className="gate-input"
+                          style={{ flex: 2, margin: 0 }}
+                        />
+                        <input
+                          type="text"
+                          value={editCode}
+                          onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                          placeholder="รหัส"
+                          className="gate-input"
+                          style={{ flex: 1, margin: 0, letterSpacing: "0.05em" }}
+                        />
                       </div>
-                    </div>
-                    {!c.isOwner && (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editMaxUses}
+                        onChange={(e) => setEditMaxUses(e.target.value)}
+                        placeholder="จำกัดกี่คน (เว้นว่าง = ไม่จำกัด)"
+                        className="gate-input"
+                        style={{ width: "100%", margin: 0, marginBottom: 8 }}
+                      />
+                      <label style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-soft)", display: "block", marginBottom: 4 }}>หมดอายุวันที่</label>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                        {([
+                          ["keep", "คงเดิม"],
+                          ["week", "7 วัน"],
+                          ["month", "1 เดือน"],
+                          ["year", "1 ปี"],
+                          ["none", "ไม่จำกัด"],
+                        ] as const).map(([val, label]) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setEditExpiry(val)}
+                            style={{
+                              flex: "1 0 auto", padding: "7px 8px", borderRadius: 10, cursor: "pointer",
+                              fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 12,
+                              border: editExpiry === val ? "2px solid var(--ink)" : "2px solid rgba(43,33,64,0.2)",
+                              background: editExpiry === val ? "var(--blue)" : "transparent",
+                              color: editExpiry === val ? "#fff" : "var(--ink)",
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          disabled={adminBusy || !editLabel.trim() || !editCode.trim()}
+                          onClick={handleSaveEditCode}
+                          style={{ flex: 1, background: "var(--green)", color: "#fff", border: "2px solid var(--ink)", borderRadius: 10, padding: "8px", fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                        >
+                          💾 บันทึก
+                        </button>
                         <button
                           type="button"
                           disabled={adminBusy}
-                          onClick={() => handleToggleCode(c.id)}
-                          style={{ background: c.revoked ? "var(--green)" : "var(--pink)", color: "#fff", border: "2px solid var(--ink)", borderRadius: 10, padding: "6px 10px", fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                          onClick={cancelEditCode}
+                          style={{ flex: 1, background: "none", color: "var(--ink-soft)", border: "2px solid rgba(43,33,64,0.2)", borderRadius: 10, padding: "8px", fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
                         >
-                          {c.revoked ? "✅ เปิดใช้งาน" : "🚫 ปิดใช้งาน"}
+                          ยกเลิก
                         </button>
-                        {c.revoked && (
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: 13.5 }}>{c.label}{c.isOwner ? " 👑" : ""}</div>
+                        <div style={{ fontFamily: "var(--font-baloo)", fontSize: 13, letterSpacing: "0.05em" }}>{c.code}</div>
+                        <div style={{ fontSize: 11.5, color: "var(--ink-soft)", fontWeight: 600 }}>
+                          ใช้ไปแล้ว {c.useCount}{c.maxUses != null ? ` / ${c.maxUses}` : ""} คน{c.revoked ? " · ปิดใช้งานอยู่" : c.expired ? " · หมดอายุแล้ว" : ""}
+                        </div>
+                        {c.expiresAt && (
+                          <div style={{ fontSize: 11.5, color: "var(--ink-soft)", fontWeight: 600 }}>
+                            หมดอายุวันที่ {new Date(c.expiresAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}
+                          </div>
+                        )}
+                      </div>
+                      {!c.isOwner && (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
                           <button
                             type="button"
                             disabled={adminBusy}
-                            onClick={() => handleDeleteCode(c.id)}
-                            style={{ background: "none", border: "none", color: "var(--ink-soft)", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline" }}
+                            onClick={() => startEditCode(c)}
+                            style={{ background: "var(--blue)", color: "#fff", border: "2px solid var(--ink)", borderRadius: 10, padding: "6px 10px", fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                           >
-                            ลบออกจากรายการถาวร
+                            ✎ แก้ไข
                           </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                          <button
+                            type="button"
+                            disabled={adminBusy}
+                            onClick={() => handleToggleCode(c.id)}
+                            style={{ background: c.revoked ? "var(--green)" : "var(--pink)", color: "#fff", border: "2px solid var(--ink)", borderRadius: 10, padding: "6px 10px", fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                          >
+                            {c.revoked ? "✅ เปิดใช้งาน" : "🚫 ปิดใช้งาน"}
+                          </button>
+                          {(c.revoked || c.expired) && (
+                            <button
+                              type="button"
+                              disabled={adminBusy}
+                              onClick={() => handleDeleteCode(c.id)}
+                              style={{ background: "none", border: "none", color: "var(--ink-soft)", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline" }}
+                            >
+                              ลบออกจากรายการถาวร
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
