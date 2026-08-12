@@ -199,6 +199,15 @@ export async function revokeVisitor(id: number): Promise<VisitorSummary[]> {
   return listVisitors();
 }
 
+export async function deleteVisitor(id: number): Promise<VisitorSummary[]> {
+  await requireOwnerSession();
+  const target = await prisma.visitor.findUnique({ where: { id } });
+  if (target && target.revoked) {
+    await prisma.visitor.delete({ where: { id } });
+  }
+  return listVisitors();
+}
+
 export type AdminSnapshot = {
   codes: {
     id: number;

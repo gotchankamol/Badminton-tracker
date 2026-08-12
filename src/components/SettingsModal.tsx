@@ -9,12 +9,9 @@ import {
   updateAccessCode,
   toggleAccessCode,
   deleteAccessCode,
-  listVisitors,
-  revokeVisitor,
   getAdminSnapshot,
   restoreAdminSnapshot,
   type AccessCodeSummary,
-  type VisitorSummary,
   type AdminSnapshot,
 } from "@/lib/session-actions";
 import { SESSION_INVALID_ERROR } from "@/lib/session-shared";
@@ -73,6 +70,7 @@ export default function SettingsModal({
   onOpenBackupImport,
   onOpenRosterExport,
   onOpenRosterImport,
+  onOpenVisitorHistory,
   onResetApp,
   sound,
   isOwner,
@@ -91,6 +89,7 @@ export default function SettingsModal({
   onOpenBackupImport: () => void;
   onOpenRosterExport: () => void;
   onOpenRosterImport: () => void;
+  onOpenVisitorHistory: () => void;
   onResetApp: () => void;
   sound: SoundControls;
   isOwner: boolean;
@@ -102,7 +101,6 @@ export default function SettingsModal({
   const [tab, setTab] = useState<"basic" | "reports" | "data" | "admin">("basic");
 
   const [codes, setCodes] = useState<AccessCodeSummary[]>([]);
-  const [visitors, setVisitors] = useState<VisitorSummary[]>([]);
   const [newLabel, setNewLabel] = useState("");
   const [newMaxUses, setNewMaxUses] = useState("");
   const [newExpiry, setNewExpiry] = useState<ExpiryPreset>("none");
@@ -122,11 +120,8 @@ export default function SettingsModal({
     let cancelled = false;
     async function load() {
       try {
-        const [c, v] = await Promise.all([listAccessCodes(), listVisitors()]);
-        if (!cancelled) {
-          setCodes(c);
-          setVisitors(v);
-        }
+        const c = await listAccessCodes();
+        if (!cancelled) setCodes(c);
       } catch (e) {
         if (e instanceof Error && e.message === SESSION_INVALID_ERROR) window.location.reload();
       }
@@ -207,14 +202,6 @@ export default function SettingsModal({
     setAdminBusy(false);
   }
 
-  async function handleRevokeVisitor(id: number) {
-    setAdminBusy(true);
-    await withAdminHistory(async () => {
-      setVisitors(await revokeVisitor(id));
-    });
-    setAdminBusy(false);
-  }
-
   async function handleAdminUndo() {
     if (adminHistoryRef.current.length === 0) return;
     setAdminBusy(true);
@@ -226,7 +213,6 @@ export default function SettingsModal({
       setAdminFutureLen(adminFutureRef.current.length);
       const result = await restoreAdminSnapshot(prev);
       setCodes(result.codes);
-      setVisitors(result.visitors);
     } catch (e) {
       if (e instanceof Error && e.message === SESSION_INVALID_ERROR) window.location.reload();
     }
@@ -244,7 +230,6 @@ export default function SettingsModal({
       setAdminFutureLen(adminFutureRef.current.length);
       const result = await restoreAdminSnapshot(next);
       setCodes(result.codes);
-      setVisitors(result.visitors);
     } catch (e) {
       if (e instanceof Error && e.message === SESSION_INVALID_ERROR) window.location.reload();
     }
@@ -661,35 +646,10 @@ export default function SettingsModal({
             </div>
 
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: "2px dashed rgba(43,33,64,0.2)" }}>
-              <div className="hint" style={{ marginTop: 0 }}>
-                👥 คนที่เคยเข้าใช้งาน ({visitors.length}) · ออนไลน์ตอนนี้ {visitors.filter((v) => v.online).length} คน
-              </div>
-              {visitors.length === 0 && <div className="hint" style={{ marginTop: 0 }}>ยังไม่มีใครเข้าใช้งาน</div>}
-              {visitors.map((v) => (
-                <div key={v.id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(43,33,64,0.08)", opacity: v.revoked ? 0.45 : 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 13.5 }}>
-                        {v.online && <span style={{ color: "var(--green)" }}>● </span>}
-                        {v.nickname}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: "var(--ink-soft)", fontWeight: 600 }}>
-                        รหัส: {v.codeLabel}{v.revoked ? " · ถูกตัดสิทธิ์แล้ว" : v.online ? " · ออนไลน์อยู่" : ""}
-                      </div>
-                    </div>
-                    {!v.revoked && (
-                      <button
-                        type="button"
-                        disabled={adminBusy}
-                        onClick={() => handleRevokeVisitor(v.id)}
-                        style={{ flexShrink: 0, background: "var(--pink)", color: "#fff", border: "2px solid var(--ink)", borderRadius: 10, padding: "6px 10px", fontFamily: "var(--font-baloo)", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
-                      >
-                        🚫 ตัดสิทธิ์
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+              <button className="save" style={{ background: "var(--purple)", fontSize: 13.5 }} onClick={onOpenVisitorHistory}>
+                📋 ดูรายงานผู้เข้าใช้งาน
+              </button>
+              <div className="hint" style={{ marginBottom: 0 }}>ดูว่าใครเคยเข้าใช้งานบ้าง ค้นหา/ส่งออกได้ และตัดสิทธิ์เป็นรายคน</div>
             </div>
           </>
         )}

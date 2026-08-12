@@ -12,6 +12,7 @@ import RosterCard from "./RosterCard";
 import ShuttlesTab from "./ShuttlesTab";
 import SummaryTab from "./SummaryTab";
 import SettingsModal from "./SettingsModal";
+import VisitorHistoryModal from "./VisitorHistoryModal";
 import HistoryModal from "./HistoryModal";
 import PlayerHistoryModal from "./PlayerHistoryModal";
 import ExportModal, { type ExportMode } from "./ExportModal";
@@ -58,6 +59,7 @@ export default function AppClient({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [playerHistoryOpen, setPlayerHistoryOpen] = useState(false);
+  const [visitorHistoryOpen, setVisitorHistoryOpen] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>(null);
   const [backupMode, setBackupMode] = useState<BackupMode>(null);
   const [rosterListMode, setRosterListMode] = useState<RosterListMode>(null);
@@ -258,11 +260,13 @@ export default function AppClient({
         onOpenBackupImport={() => setBackupMode("import")}
         onOpenRosterExport={() => setRosterListMode("export")}
         onOpenRosterImport={() => setRosterListMode("import")}
+        onOpenVisitorHistory={() => { setSettingsOpen(false); setVisitorHistoryOpen(true); }}
         onResetApp={handleResetApp}
         sound={sound}
       />
       <HistoryModal open={historyOpen} onClose={() => { setHistoryOpen(false); setSettingsOpen(true); }} state={state} showToast={showToast} />
       <PlayerHistoryModal open={playerHistoryOpen} onClose={() => { setPlayerHistoryOpen(false); setSettingsOpen(true); }} state={state} />
+      <VisitorHistoryModal open={visitorHistoryOpen} onClose={() => { setVisitorHistoryOpen(false); setSettingsOpen(true); }} isOwner={session.isOwner} showToast={showToast} />
       <ExportModal mode={exportMode} onClose={() => setExportMode(null)} state={state} showToast={showToast} />
       <BackupModal
         mode={backupMode}
