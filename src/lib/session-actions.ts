@@ -232,10 +232,8 @@ export type AdminSnapshot = {
 
 export async function getAdminSnapshot(): Promise<AdminSnapshot> {
   await requireOwnerSession();
-  const [codes, visitors] = await Promise.all([
-    prisma.accessCode.findMany({ orderBy: { id: "asc" } }),
-    prisma.visitor.findMany({ orderBy: { id: "asc" } }),
-  ]);
+  const codes = await prisma.accessCode.findMany({ orderBy: { id: "asc" } });
+  const visitors = await prisma.visitor.findMany({ orderBy: { id: "asc" } });
   return {
     codes: codes.map((c) => ({ ...c, createdAt: c.createdAt.toISOString(), expiresAt: c.expiresAt ? c.expiresAt.toISOString() : null })),
     visitors: visitors.map((v) => ({ ...v, createdAt: v.createdAt.toISOString(), lastSeenAt: v.lastSeenAt.toISOString() })),
